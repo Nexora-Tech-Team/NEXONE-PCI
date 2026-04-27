@@ -1,0 +1,95 @@
+version: '3.9'
+
+services:
+  # ─── PostgreSQL ──────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: cbqa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend (Golang) ────────────────────────────────
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: cbqa_backend
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      ENV: ${ENV}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP_HOURS: ${JWT_EXP_HOURS}
+      UPLOAD_DIR: /app/uploads
+      APP_URL: ${APP_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:-noreply@cbqa.com}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Frontend (React + Nginx) ────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: cbqa_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://backend:8080/api/v1
+
+  # ─── pgAdmin (optional, for DB management) ───────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cbqa_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  default:
+    name: cbqa_network

@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { font-size: 14px; }
+  body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background-color: #f0f4f8;
+    color: #1f2937;
+    line-height: 1.5;
+  }
+  button, input, select, textarea { font: inherit; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply bg-primary text-white shadow-sm; }
+  .btn-primary:hover { background-color: #14405e; }
+  .btn-secondary { @apply border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50; }
+  .btn-danger { @apply bg-danger text-white shadow-sm hover:bg-red-700; }
+
+  .card { @apply rounded-xl border border-gray-200 bg-white shadow-sm; }
+  .card-header { @apply flex items-center justify-between border-b border-gray-100 px-4 py-3; }
+  .card-body { @apply p-4; }
+
+  .table-container { @apply overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm; }
+  .table { @apply w-full text-sm; }
+  .table thead tr { @apply bg-slate-50; }
+  .table th { @apply whitespace-nowrap px-3 py-3 text-left text-[13px] font-medium text-gray-500; }
+  .table td { @apply border-t border-gray-100 px-3 py-3 align-middle; }
+  .table tr:hover td { @apply bg-slate-50; }
+
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-medium; }
+  .badge-blue { @apply bg-blue-100 text-blue-800; }
+  .badge-green { @apply bg-green-100 text-green-800; }
+  .badge-red { @apply bg-red-100 text-red-800; }
+  .badge-orange { @apply bg-orange-100 text-orange-800; }
+  .badge-gray { @apply bg-gray-100 text-gray-600; }
+  .badge-purple { @apply bg-purple-100 text-purple-800; }
+  .badge-yellow { @apply bg-yellow-100 text-yellow-800; }
+
+  .input, .input-field { @apply w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-colors focus:outline-none; }
+  .input:focus, .input-field:focus { border-color: #2980b9; box-shadow: 0 0 0 1px #2980b9; }
+  .input-sm { @apply px-3 py-2 text-sm; }
+  .label { @apply block text-sm font-medium text-gray-600 mb-1.5; }
+
+  .page-title { @apply text-xl font-semibold text-gray-900; }
+  .section-title { @apply text-base font-medium text-gray-700; }
+
+  .nav-link { @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium transition-all duration-200; color: rgba(255,255,255,0.78); }
+  .nav-link:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .nav-link.active { background: #fff; color: #1a5276; box-shadow: 0 10px 24px rgba(7, 61, 71, 0.12); }
+  .nav-sub { @apply ml-3 pl-4 text-[13px]; }
+
+  .view-tab { @apply px-4 py-2.5 text-sm cursor-pointer text-gray-500 border-b-2 border-transparent -mb-px; }
+  .view-tab.active { border-bottom-color: #2980b9; color: #2980b9; @apply font-medium; }
+
+  .empty-state { @apply text-center py-10 text-gray-400 text-sm; }
+
+  .progress-bar { @apply h-1.5 bg-gray-200 rounded-full overflow-hidden; }
+  .progress-fill { @apply h-full rounded-full; background-color: #2980b9; }
+
+  .modal-overlay { @apply fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4; }
+  .modal { @apply bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]; }
+  .modal-header { @apply px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0; }
+  .modal-body { @apply px-5 py-4 overflow-y-auto; }
+  .modal-footer { @apply px-5 py-4 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0; }
+
+  .stat-card { @apply bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 shadow-sm; }
+  .stat-icon { @apply w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0; }
+  .stat-val { @apply text-2xl font-semibold text-gray-900; }
+  .stat-label { @apply mt-1 text-sm text-gray-500; }
+
+  .kanban-col { @apply bg-slate-50 rounded-xl p-3 min-w-[200px]; }
+  .kanban-card { @apply bg-white border border-gray-200 rounded-xl p-3 mb-2 cursor-pointer hover:border-gray-300 transition-colors; }
+
+  .pagination { @apply flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500; }
+  .page-btn { @apply w-8 h-8 flex items-center justify-center border border-gray-200 rounded text-sm cursor-pointer hover:bg-gray-50; }
+  .page-btn.active { background-color: #2980b9; @apply text-white; border-color: #2980b9; }
+}
