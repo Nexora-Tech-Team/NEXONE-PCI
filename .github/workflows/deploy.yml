@@ -25,22 +25,19 @@ jobs:
             echo "📥 Pull latest code"
             git pull origin main
 
-            echo "🛑 Stop container lama"
-            docker compose down
-
             echo "🔧 Build & start container"
-            docker compose up -d --build
+            docker compose up -d --build --remove-orphans
 
             echo "⏳ Tunggu container ready"
             sleep 15
 
-            echo "🔍 Pastikan container jalan"
-            docker ps | grep nexone-app
+            echo "🔍 Cek container"
+            docker ps | grep nexone || (echo "Container tidak jalan!" && exit 1)
 
-            echo "🗄️ Run Prisma Migration (safe)"
-            docker exec nexone-app sh -c "npx prisma migrate deploy || echo 'No migration'"
+            echo "🗄️ Run Prisma Migration"
+            docker compose exec -T backend npx prisma migrate deploy || echo "No migration"
 
-            echo "🔁 Restart app"
-            docker restart nexone-app
+            echo "🔁 Restart backend"
+            docker compose restart backend
 
             echo "✅ Deploy selesai"
