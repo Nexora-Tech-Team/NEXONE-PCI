@@ -4,7 +4,7 @@ services:
   # ─── PostgreSQL ──────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: cbqa_postgres
+    container_name: nexone_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -25,7 +25,7 @@ services:
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    container_name: cbqa_backend
+    container_name: nexone_backend
     restart: unless-stopped
     environment:
       PORT: 8080
@@ -62,7 +62,7 @@ services:
     build:
       context: ./Frontend
       dockerfile: Dockerfile
-    container_name: cbqa_frontend
+    container_name: nexone_frontend
     restart: unless-stopped
     ports:
       - "3000:80"
@@ -74,7 +74,7 @@ services:
   # ─── pgAdmin (optional, for DB management) ───────────
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: cbqa_pgadmin
+    container_name: nexone_pgadmin
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
@@ -92,4 +92,4 @@ volumes:
 
 networks:
   default:
-    name: cbqa_network
+    name: nexone_network
