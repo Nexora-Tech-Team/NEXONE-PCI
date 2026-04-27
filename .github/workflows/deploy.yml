@@ -31,13 +31,13 @@ jobs:
             echo "⏳ Tunggu container ready"
             sleep 15
 
-            echo "🔍 Cek container"
-            docker ps | grep nexone || (echo "Container tidak jalan!" && exit 1)
+            echo "🔍 Cek container backend"
+            docker ps | grep nexone-backend-1 || (echo "Backend tidak jalan!" && exit 1)
 
             echo "🗄️ Run Prisma Migration"
-            docker compose exec -T backend npx prisma migrate deploy || echo "No migration"
+            docker exec nexone-backend-1 npx prisma migrate deploy || echo "No migration"
 
             echo "🔁 Restart backend"
-            docker compose restart backend
+            docker restart nexone-backend-1
 
             echo "✅ Deploy selesai"
