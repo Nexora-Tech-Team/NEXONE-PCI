@@ -3,7 +3,7 @@ import { taskService, projectService, teamService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { toast } from 'react-toastify'
-import { Plus, Filter, FileDown } from 'lucide-react'
+import { Plus, Filter, FileDown, Pencil, X, Check } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
@@ -11,9 +11,15 @@ import {
 } from '@/components/common'
 
 const VIEWS = [{ key: 'list', label: 'List' }, { key: 'kanban', label: 'Kanban' }, { key: 'gantt', label: 'Gantt' }]
-const KANBAN_COLS = ['todo', 'in_progress', 'done', 'expired']
-const COL_LABELS: Record<string, string> = { todo: 'To Do', in_progress: 'In Progress', done: 'Done', expired: 'Expired' }
-const COL_COLORS: Record<string, string> = { todo: 'bg-gray-100', in_progress: 'bg-blue-50', done: 'bg-green-50', expired: 'bg-red-50' }
+
+// Default columns
+const DEFAULT_COLS = [
+  { id: 'todo', label: 'To Do', color: 'bg-gray-100' },
+  { id: 'in_progress', label: 'In Progress', color: 'bg-blue-50' },
+  { id: 'done', label: 'Done', color: 'bg-green-50' },
+  { id: 'expired', label: 'Expired', color: 'bg-red-50' },
+]
+
 const priorityColor: Record<string, string> = { high: 'text-red-500', medium: 'text-yellow-500', low: 'text-green-500' }
 
 export default function TasksPage() {
@@ -31,8 +37,13 @@ export default function TasksPage() {
   const [showManageLabels, setShowManageLabels] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [kanbanCols, setKanbanCols] = useState(DEFAULT_COLS)
+  const [editingCol, setEditingCol] = useState<string | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
+  const [showAddCol, setShowAddCol] = useState(false)
+  const [newColLabel, setNewColLabel] = useState('')
   const [form, setForm] = useState<any>({
-    title: '', project_id: '', assigned_to_id: '', status: 'todo', priority: 'medium',
+    title: '', project_id: '', assigned_to_id: '', status: kanbanCols[0]?.id || 'todo', priority: 'medium',
     start_date: '', deadline: '', description: '',
   })
 
@@ -88,16 +99,55 @@ export default function TasksPage() {
     setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
     try {
       await taskService.updateStatus(taskId, newStatus)
+      // Auto refresh both Kanban and List views
+      loadAll()
+      load()
     } catch {
       toast.error('Failed to update status')
       loadAll()
+      load()
     }
   }
 
-  const kanbanTasks = KANBAN_COLS.reduce((acc, col) => {
-    acc[col] = allTasks.filter(t => t.status === col)
+  const kanbanTasks = kanbanCols.reduce((acc, col) => {
+    acc[col.id] = allTasks.filter(t => t.status === col.id)
     return acc
   }, {} as Record<string, any[]>)
+
+  // Column editing functions
+  const startEditCol = (colId: string, currentLabel: string) => {
+    setEditingCol(colId)
+    setEditingLabel(currentLabel)
+  }
+
+  const saveColLabel = (colId: string) => {
+    if (!editingLabel.trim()) return
+    setKanbanCols(prev => prev.map(c => c.id === colId ? { ...c, label: editingLabel.trim() } : c))
+    setEditingCol(null)
+    setEditingLabel('')
+  }
+
+  const addNewColumn = () => {
+    if (!newColLabel.trim()) return
+    const newId = newColLabel.trim().toLowerCase().replace(/\s+/g, '_')
+    if (kanbanCols.some(c => c.id === newId)) {
+      toast.error('Column already exists')
+      return
+    }
+    const colors = ['bg-gray-100', 'bg-blue-50', 'bg-green-50', 'bg-red-50', 'bg-purple-50', 'bg-yellow-50', 'bg-pink-50', 'bg-indigo-50']
+    const newCol = { id: newId, label: newColLabel.trim(), color: colors[kanbanCols.length % colors.length] }
+    setKanbanCols(prev => [...prev, newCol])
+    setNewColLabel('')
+    setShowAddCol(false)
+  }
+
+  const deleteColumn = (colId: string) => {
+    if (kanbanCols.length <= 1) {
+      toast.error('Cannot delete the last column')
+      return
+    }
+    setKanbanCols(prev => prev.filter(c => c.id !== colId))
+  }
 
   return (
     <div className="p-5">
@@ -120,10 +170,9 @@ export default function TasksPage() {
             left={
               <select className="input input-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
                 <option value="">All status</option>
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
-                <option value="expired">Expired</option>
+                {kanbanCols.map(col => (
+                  <option key={col.id} value={col.id}>{col.label}</option>
+                ))}
               </select>
             }
             right={
@@ -174,20 +223,41 @@ export default function TasksPage() {
       {view === 'kanban' && (
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
-            {KANBAN_COLS.map(col => (
-              <div key={col} className="flex-shrink-0 w-64">
-                <div className={`rounded-t-lg px-3 py-2 flex items-center justify-between ${COL_COLORS[col]}`}>
-                  <span className="text-xs font-semibold text-gray-600">{COL_LABELS[col]}</span>
-                  <span className="text-xs bg-white rounded-full px-1.5 py-0.5 text-gray-500">{kanbanTasks[col]?.length}</span>
+            {kanbanCols.map(col => (
+              <div key={col.id} className="flex-shrink-0 w-64">
+                <div className={`rounded-t-lg px-3 py-2 flex items-center justify-between ${col.color}`}>
+                  {editingCol === col.id ? (
+                    <div className="flex items-center gap-1 flex-1">
+                      <input
+                        type="text"
+                        value={editingLabel}
+                        onChange={e => setEditingLabel(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && saveColLabel(col.id)}
+                        className="text-xs font-semibold text-gray-600 bg-white border border-gray-300 rounded px-1 py-0.5 w-full"
+                        autoFocus
+                      />
+                      <button onClick={() => saveColLabel(col.id)} className="text-green-500 hover:text-green-700"><Check size={12} /></button>
+                      <button onClick={() => setEditingCol(null)} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-xs font-semibold text-gray-600">{col.label}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs bg-white rounded-full px-1.5 py-0.5 text-gray-500">{kanbanTasks[col.id]?.length}</span>
+                        <button onClick={() => startEditCol(col.id, col.label)} className="text-gray-400 hover:text-gray-600"><Pencil size={10} /></button>
+                        <button onClick={() => deleteColumn(col.id)} className="text-gray-400 hover:text-red-500">×</button>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <Droppable droppableId={col}>
+                <Droppable droppableId={col.id}>
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`min-h-[200px] p-2 rounded-b-lg border border-t-0 border-gray-200 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50' : 'bg-white'}`}
                     >
-                      {kanbanTasks[col]?.map((task, index) => (
+                      {kanbanTasks[col.id]?.map((task, index) => (
                         <Draggable key={task.id} draggableId={String(task.id)} index={index}>
                           {(prov, snap) => (
                             <div
@@ -217,6 +287,33 @@ export default function TasksPage() {
                 </Droppable>
               </div>
             ))}
+            {/* Add new column button */}
+            <div className="flex-shrink-0 w-64">
+              {showAddCol ? (
+                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                  <input
+                    type="text"
+                    value={newColLabel}
+                    onChange={e => setNewColLabel(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addNewColumn()}
+                    placeholder="Column name..."
+                    className="input input-sm w-full mb-2"
+                    autoFocus
+                  />
+                  <div className="flex gap-1">
+                    <button onClick={addNewColumn} className="btn btn-primary btn-sm text-xs">Add</button>
+                    <button onClick={() => { setShowAddCol(false); setNewColLabel('') }} className="btn btn-secondary btn-sm text-xs">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddCol(true)}
+                  className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:text-gray-600 hover:border-gray-400 text-sm transition-colors"
+                >
+                  + Add Column
+                </button>
+              )}
+            </div>
           </div>
         </DragDropContext>
       )}
@@ -224,7 +321,7 @@ export default function TasksPage() {
       {/* Gantt View */}
       {view === 'gantt' && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
-          <GanttView tasks={allTasks} />
+          <GanttView tasks={allTasks} columns={kanbanCols} />
         </div>
       )}
 
@@ -257,9 +354,9 @@ export default function TasksPage() {
           </FormField>
           <FormField label="Status">
             <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="done">Done</option>
+              {kanbanCols.map(col => (
+                <option key={col.id} value={col.id}>{col.label}</option>
+              ))}
             </select>
           </FormField>
           <FormField label="Priority">
@@ -289,7 +386,7 @@ export default function TasksPage() {
   )
 }
 
-function GanttView({ tasks }: { tasks: any[] }) {
+function GanttView({ tasks, columns }: { tasks: any[]; columns: { id: string; label: string }[] }) {
   const valid = tasks.filter(t => t.start_date && t.deadline)
   if (valid.length === 0) return <EmptyState message="No tasks with dates to display." />
 
@@ -298,7 +395,12 @@ function GanttView({ tasks }: { tasks: any[] }) {
   const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
   const totalDays = Math.max((maxDate.getTime() - minDate.getTime()) / 86400000, 1)
 
-  const barColors: Record<string, string> = { todo: 'bg-gray-400', in_progress: 'bg-blue-500', done: 'bg-green-500', expired: 'bg-red-500' }
+  // Dynamic colors based on columns
+  const defaultColors = ['bg-gray-400', 'bg-blue-500', 'bg-green-500', 'bg-red-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500']
+  const barColors = columns.reduce((acc, col, idx) => {
+    acc[col.id] = defaultColors[idx % defaultColors.length]
+    return acc
+  }, {} as Record<string, string>)
 
   return (
     <div className="min-w-[700px]">

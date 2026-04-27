@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
-import logoUrl from '../../../logo/logo_ref.png'
-import loginBg from '../../../logo/login-bg.png'
-import nexoraUrl from '../../../logo/Logo_Nexora_Part.png'
+import nexoneLogoUrl from '../../../logo/Logo_Nexone.png'
+
 import { KeyRound, CheckCircle, Eye, EyeOff } from 'lucide-react'
 
 export default function ResetPasswordPage() {
@@ -38,13 +37,10 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex bg-white">
-      <div
-        className="w-full lg:w-1/2 xl:w-5/12 2xl:w-1/3 flex flex-col justify-center relative"
-        style={{ borderTop: '3px solid #2aacb8' }}
-      >
-        <div className="w-full px-8 py-10">
-          <div className="flex justify-center mb-8">
-            <img src={logoUrl} alt="CBQA Global" style={{ width: 160 }} />
+      <div className="w-full lg:w-[40%] xl:w-[38%] flex flex-col justify-center">
+        <div className="w-full px-10 xl:px-16 py-12">
+          <div className="mb-10">
+            <img src={nexoneLogoUrl} alt="NEXONE by NEXORA" className="h-[280px] w-auto object-contain" />
           </div>
 
           <div className="flex justify-center mb-5">
@@ -119,14 +115,22 @@ export default function ResetPasswordPage() {
           )}
         </div>
 
-        <div className="absolute bottom-0 left-4">
-          <img src={nexoraUrl} alt="Nexora" style={{ width: 130, opacity: 0.90 }} />
-        </div>
       </div>
 
-      <div className="hidden lg:block flex-1 relative overflow-hidden">
-        <div className="absolute inset-0 bg-center bg-cover" style={{ backgroundImage: `url(${loginBg})`, filter: 'blur(24px)', transform: 'scale(1.08)' }} />
-        <div className="absolute inset-0 bg-center bg-no-repeat" style={{ backgroundImage: `url(${loginBg})`, backgroundSize: 'contain' }} />
+      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: '#0c1f40' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }} />
+        <div className="relative z-10 flex flex-col justify-center items-center w-full px-12 text-center">
+          <h2 className="text-[2rem] font-bold text-white leading-tight mb-2">Smarter operations,</h2>
+          <h2 className="text-[2rem] font-bold leading-tight mb-4" style={{ color: '#3b82f6' }}>unified control</h2>
+          <div className="w-12 h-[3px] rounded-full mx-auto mb-5" style={{ background: '#3b82f6' }} />
+          <p className="text-[14px] max-w-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            Run your entire business in one integrated platform—
+            connecting people, processes, finance, and clients to drive efficiency, visibility, and growth.
+          </p>
+        </div>
       </div>
     </div>
   )
