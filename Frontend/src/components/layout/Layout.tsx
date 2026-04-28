@@ -5,32 +5,17 @@ import { RootState, AppDispatch } from '@/store'
 import { fetchMe, logoutAsync, canEdit, canRead } from '@/store/slices/authSlice'
 import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, teamService } from '@/services/api'
+import { dashboardItem, navGroups } from '@/config/navigation'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
-  TrendingUp, FileText, MessageSquare, UserCircle,
-  FolderOpen, Receipt, BarChart2, CheckCircle, Menu, Search,
-  Bell, Globe, Clock, Plus, LogOut, ChevronDown, ChevronRight, X,
-  ShoppingCart, ShoppingBag, Package, Banknote, CalendarX, Megaphone,
-  Boxes, HelpCircle, Shield, ShieldCheck, UserCog, FileCheck, StickyNote, LogIn, Check
+  TrendingUp, Menu, Search,
+  Bell, Globe, Clock, Plus, LogOut, ChevronDown, ChevronRight, X, Megaphone,
+  LogIn, Check
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'react-toastify'
-
-type NavLeaf = {
-  to: string
-  icon: LucideIcon
-  label: string
-  menu: string
-  comingSoon?: boolean
-}
-
-type NavGroupDef = {
-  id: string
-  label: string
-  items: NavLeaf[]
-}
 
 type HeaderPanel = 'search' | 'quick-add' | 'locale' | 'activity' | 'notifications' | null
 
@@ -84,7 +69,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: 'project', label: 'New project', description: 'Start a project workspace', to: '/projects', menu: 'projects', icon: FolderKanban },
   { id: 'client', label: 'New client', description: 'Add a relationship record', to: '/clients', menu: 'clients', icon: Users },
   { id: 'lead', label: 'New lead', description: 'Capture a potential deal', to: '/leads', menu: 'leads', icon: TrendingUp },
-  { id: 'announcement', label: 'New announcement', description: 'Post an internal update', to: '/team/announcements', menu: 'team', icon: Megaphone },
+  { id: 'announcement', label: 'New announcement', description: 'Post an internal update', to: '/team/announcements', menu: 'team.announcements', icon: Megaphone },
 ]
 
 const LOCALE_OPTIONS: LocaleOption[] = [
@@ -160,91 +145,6 @@ function isActiveAnnouncement(item: AnnouncementItem) {
 
   return true
 }
-
-const dashboardItem: NavLeaf = { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', menu: 'dashboard' }
-
-const navGroups: NavGroupDef[] = [
-  {
-    id: 'business',
-    label: 'Business & Sales',
-    items: [
-      { to: '/clients', icon: Users, label: 'Clients', menu: 'clients' },
-      { to: '/leads', icon: TrendingUp, label: 'Leads', menu: 'leads' },
-      { to: '/sales/orders', icon: ShoppingCart, label: 'Orders', menu: 'sales' },
-      { to: '/sales/contracts', icon: FileCheck, label: 'Contracts', menu: 'sales' },
-      { to: '/sales/store', icon: ShoppingBag, label: 'Store', menu: 'sales' },
-      { to: '/sales/items', icon: Package, label: 'Items', menu: 'sales' },
-    ],
-  },
-  {
-    id: 'operations',
-    label: 'Operations',
-    items: [
-      { to: '/projects', icon: FolderKanban, label: 'Projects', menu: 'projects' },
-      { to: '/tasks', icon: CheckSquare, label: 'Tasks', menu: 'tasks' },
-      { to: '/todo', icon: CheckCircle, label: 'To Do', menu: 'todo' },
-      { to: '/events', icon: Calendar, label: 'Events', menu: 'events' },
-    ],
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    items: [
-      { to: '/sales/invoices', icon: FileText, label: 'Invoices', menu: 'sales' },
-      { to: '/sales/payments', icon: Banknote, label: 'Payments', menu: 'sales' },
-      { to: '/expenses', icon: Receipt, label: 'Expenses', menu: 'expenses' },
-    ],
-  },
-  {
-    id: 'people',
-    label: 'People',
-    items: [
-      { to: '/team/members', icon: UserCircle, label: 'Team', menu: 'team' },
-      { to: '/team/timecards', icon: Clock, label: 'Time Cards', menu: 'team' },
-      { to: '/team/leave', icon: CalendarX, label: 'Leave', menu: 'team' },
-      { to: '/team/announcements', icon: Megaphone, label: 'Announcements', menu: 'team' },
-    ],
-  },
-  {
-    id: 'collaboration',
-    label: 'Collaboration',
-    items: [
-      { to: '/messages', icon: MessageSquare, label: 'Messages', menu: 'messages' },
-      { to: '/notes', icon: StickyNote, label: 'Notes', menu: 'notes' },
-      { to: '/files', icon: FolderOpen, label: 'Files', menu: 'files' },
-    ],
-  },
-  {
-    id: 'assets',
-    label: 'Assets',
-    items: [
-      { to: '/assets', icon: Boxes, label: 'Asset Management', menu: 'assets', comingSoon: true },
-    ],
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
-    items: [
-      { to: '/reports', icon: BarChart2, label: 'Reports', menu: 'reports' },
-    ],
-  },
-  {
-    id: 'system',
-    label: 'System',
-    items: [
-      { to: '/settings/users', icon: UserCog, label: 'User Accounts', menu: 'settings' },
-      { to: '/settings/roles', icon: Shield, label: 'Roles', menu: 'settings' },
-      { to: '/settings/audit-log', icon: ShieldCheck, label: 'Audit Trail', menu: 'settings' },
-    ],
-  },
-  {
-    id: 'help',
-    label: 'Help',
-    items: [
-      { to: '/team/help', icon: HelpCircle, label: 'Help', menu: 'team' },
-    ],
-  },
-]
 
 export default function Layout() {
   const dispatch = useDispatch<AppDispatch>()
@@ -483,7 +383,7 @@ export default function Layout() {
   const userInitials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
   const isDashVisible = canRead(permissions, user?.role, dashboardItem.menu)
-  const canViewAuditTrail = canRead(permissions, user?.role, 'settings')
+  const canViewAuditTrail = canRead(permissions, user?.role, 'settings.audit-log')
 
   const closePanels = () => {
     setActivePanel(null)
