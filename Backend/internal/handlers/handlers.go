@@ -330,6 +330,15 @@ type TaskHandler struct{ db *gorm.DB }
 
 func NewTaskHandler(db *gorm.DB) *TaskHandler { return &TaskHandler{db: db} }
 
+func isValidTaskStatus(status string) bool {
+	switch status {
+	case "todo", "in_progress", "done", "expired":
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *TaskHandler) List(c *gin.Context) {
 	var q PaginationQuery
 	c.ShouldBindQuery(&q)
@@ -342,11 +351,18 @@ func (h *TaskHandler) List(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if projectID := c.Query("project_id"); projectID != "" {
+		query = query.Where("project_id = ?", projectID)
+	}
 	if assignedTo := c.Query("assigned_to_id"); assignedTo != "" {
 		query = query.Where("assigned_to_id = ?", assignedTo)
 	}
 	query.Count(&total)
-	query.Scopes(paginate(q)).Order("id desc").Find(&tasks)
+	result := query.Order("updated_at desc, id desc")
+	if !strings.EqualFold(c.Query("fetch_all"), "true") {
+		result = result.Scopes(paginate(q))
+	}
+	result.Find(&tasks)
 	c.JSON(http.StatusOK, gin.H{"data": tasks, "total": total})
 }
 
@@ -356,7 +372,17 @@ func (h *TaskHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&task)
+	if task.Status == "" {
+		task.Status = "todo"
+	}
+	if !isValidTaskStatus(task.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
+		return
+	}
+	if err := h.db.Create(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "task", task.ID, task.Title)
 	c.JSON(http.StatusCreated, task)
 }
@@ -378,20 +404,59 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	c.ShouldBindJSON(&task)
-	h.db.Save(&task)
+	if err := c.ShouldBindJSON(&task); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if task.Status == "" {
+		task.Status = "todo"
+	}
+	if !isValidTaskStatus(task.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
+		return
+	}
+	if err := h.db.Save(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "update", "task", task.ID, task.Title)
 	c.JSON(http.StatusOK, task)
 }
 
 func (h *TaskHandler) UpdateStatus(c *gin.Context) {
-	id, _ := getID(c)
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task id"})
+		return
+	}
+
+	var task models.Task
+	if err := h.db.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
 	var req struct {
 		Status string `json:"status"`
 	}
-	c.ShouldBindJSON(&req)
-	h.db.Model(&models.Task{}).Where("id = ?", id).Update("status", req.Status)
-	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !isValidTaskStatus(req.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
+		return
+	}
+	if err := h.db.Model(&task).Update("status", req.Status).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Labels").First(&task, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "update_status", "task", task.ID, task.Title)
+	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "data": task})
 }
 
 func (h *TaskHandler) Delete(c *gin.Context) {
