@@ -18,18 +18,42 @@ function buildPermMap(permissions: Role['permissions']): PermMap {
   const map: PermMap = {}
   permissionItems.forEach(item => {
     const permission = findPermissionEntry(permissions, item.menu)
-    map[item.menu] = {
+    map[item.menu] = sanitizePermission({
       can_read: permission?.can_read ?? false,
       can_edit: permission?.can_edit ?? false,
-    }
+    })
   })
   return map
 }
 
-function normalizePermission(next: { can_read: boolean; can_edit: boolean }) {
-  if (next.can_edit) next.can_read = true
-  if (!next.can_read) next.can_edit = false
-  return next
+function sanitizePermission(permission: { can_read: boolean; can_edit: boolean }) {
+  if (permission.can_edit) {
+    return { can_read: true, can_edit: true }
+  }
+
+  if (!permission.can_read) {
+    return { can_read: false, can_edit: false }
+  }
+
+  return permission
+}
+
+function applyPermissionChange(
+  current: { can_read: boolean; can_edit: boolean },
+  field: 'can_read' | 'can_edit',
+  value: boolean
+) {
+  if (field === 'can_read') {
+    return {
+      can_read: value,
+      can_edit: value ? current.can_edit : false,
+    }
+  }
+
+  return {
+    can_read: value ? true : current.can_read,
+    can_edit: value,
+  }
 }
 
 export default function RolesPage() {
@@ -115,7 +139,7 @@ export default function RolesPage() {
     if (!permRole) return
     setSaving(true)
     const permissions = permissionItems.flatMap(item => {
-      const permission = normalizePermission({
+      const permission = sanitizePermission({
         can_read: permMap[item.menu]?.can_read ?? false,
         can_edit: permMap[item.menu]?.can_edit ?? false,
       })
@@ -140,7 +164,7 @@ export default function RolesPage() {
   const togglePerm = (menu: string, field: 'can_read' | 'can_edit') => {
     setPermMap(prev => {
       const current = prev[menu] ?? { can_read: false, can_edit: false }
-      const next = normalizePermission({ ...current, [field]: !current[field] })
+      const next = applyPermissionChange(current, field, !current[field])
       return { ...prev, [menu]: next }
     })
   }
@@ -149,11 +173,8 @@ export default function RolesPage() {
     setPermMap(prev => {
       const next = { ...prev }
       permissionItems.forEach(item => {
-        next[item.menu] = normalizePermission({
-          can_read: next[item.menu]?.can_read ?? false,
-          can_edit: next[item.menu]?.can_edit ?? false,
-          [field]: value,
-        })
+        const current = next[item.menu] ?? { can_read: false, can_edit: false }
+        next[item.menu] = applyPermissionChange(current, field, value)
       })
       return next
     })
@@ -163,11 +184,8 @@ export default function RolesPage() {
     setPermMap(prev => {
       const next = { ...prev }
       menus.forEach(menu => {
-        next[menu] = normalizePermission({
-          can_read: next[menu]?.can_read ?? false,
-          can_edit: next[menu]?.can_edit ?? false,
-          [field]: value,
-        })
+        const current = next[menu] ?? { can_read: false, can_edit: false }
+        next[menu] = applyPermissionChange(current, field, value)
       })
       return next
     })
