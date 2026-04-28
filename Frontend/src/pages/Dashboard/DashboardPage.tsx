@@ -7,7 +7,6 @@ import {
   CheckSquare,
   Clock,
   CreditCard,
-  Filter,
   FolderKanban,
   TrendingUp,
   Users,
@@ -26,7 +25,7 @@ import { formatIDR } from '@/utils/format'
 const TASK_COLORS = ['#f97316', '#3b82f6', '#10b981', '#ef4444']
 
 const EMPTY_STATS = {
-  range: 'all',
+  range: '30d',
   open_tasks: 0,
   open_projects: 0,
   completed_projects: 0,
@@ -52,11 +51,7 @@ const EMPTY_STATS = {
 }
 
 type DashboardStats = typeof EMPTY_STATS
-type RangeFilter = 'all' | '7d' | '30d' | '90d' | 'ytd'
-type TaskStatusFilter = 'all' | 'todo' | 'in_progress' | 'done' | 'expired'
-type ProjectStatusFilter = 'all' | 'open' | 'completed' | 'hold'
-type FocusFilter = 'all' | 'operations' | 'finance' | 'team'
-type SectionKey = Exclude<FocusFilter, 'all'>
+type SectionKey = 'operations' | 'finance' | 'team'
 
 type DashboardTask = {
   id: number
@@ -70,11 +65,6 @@ type DashboardProject = {
   id: number
   title: string
   progress: number
-}
-
-type SelectOption<T extends string> = {
-  value: T
-  label: string
 }
 
 type SummaryTile = {
@@ -97,29 +87,6 @@ type QuickAccessItem = {
   icon: typeof CheckSquare
   section: SectionKey
 }
-
-const RANGE_OPTIONS: SelectOption<RangeFilter>[] = [
-  { value: 'all', label: 'All time' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: 'ytd', label: 'Year to date' },
-]
-
-const TASK_STATUS_OPTIONS: SelectOption<TaskStatusFilter>[] = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'todo', label: 'To do' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'done', label: 'Done' },
-  { value: 'expired', label: 'Expired' },
-]
-
-const PROJECT_STATUS_OPTIONS: SelectOption<ProjectStatusFilter>[] = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'open', label: 'Open' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'hold', label: 'Hold' },
-]
 
 const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
   {
@@ -165,39 +132,6 @@ const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     section: 'team',
   },
 ]
-
-function formatFilterLabel<T extends string>(options: SelectOption<T>[], value: T) {
-  return options.find(option => option.value === value)?.label ?? value
-}
-
-function DashboardSelect<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: T
-  onChange: (value: T) => void
-  options: SelectOption<T>[]
-}) {
-  return (
-    <label className="flex min-w-[160px] flex-1 flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">{label}</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value as T)}
-        className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-white/40"
-      >
-        {options.map(option => (
-          <option key={option.value} value={option.value} className="text-gray-900">
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
 
 function ClickableSummaryCard({
   label,
@@ -246,10 +180,6 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [loading, setLoading] = useState(true)
   const [clockLoading, setClockLoading] = useState(false)
-  const [rangeFilter, setRangeFilter] = useState<RangeFilter>('30d')
-  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('all')
-  const [projectStatusFilter, setProjectStatusFilter] = useState<ProjectStatusFilter>('open')
-  const [focusFilter, setFocusFilter] = useState<FocusFilter>('all')
 
   const hasAccess = useCallback((menu: string) => (
     canRead(permissions, user?.role, menu)
@@ -283,23 +213,7 @@ export default function DashboardPage() {
     return visibleItem?.to ?? '/login'
   }, [permissions, user?.role])
 
-  const focusOptions = useMemo<SelectOption<FocusFilter>[]>(() => {
-    const options: SelectOption<FocusFilter>[] = [{ value: 'all', label: 'All visible modules' }]
-    if (canViewOperations) options.push({ value: 'operations', label: 'Operations' })
-    if (canViewFinance) options.push({ value: 'finance', label: 'Finance' })
-    if (canViewTeam) options.push({ value: 'team', label: 'Team' })
-    return options
-  }, [canViewFinance, canViewOperations, canViewTeam])
-
-  useEffect(() => {
-    if (!focusOptions.some(option => option.value === focusFilter)) {
-      setFocusFilter('all')
-    }
-  }, [focusFilter, focusOptions])
-
-  const matchesFocus = useCallback((section: SectionKey) => (
-    focusFilter === 'all' || focusFilter === section
-  ), [focusFilter])
+  const matchesFocus = useCallback((_section: SectionKey) => true, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -308,11 +222,10 @@ export default function DashboardPage() {
       const projectParams: Record<string, string | number> = { limit: 3 }
 
       if (user?.id) taskParams.assigned_to_id = user.id
-      if (taskStatusFilter !== 'all') taskParams.status = taskStatusFilter
-      if (projectStatusFilter !== 'all') projectParams.status = projectStatusFilter
+      projectParams.status = 'open'
 
       const [dashboardResponse, tasksResponse, projectsResponse] = await Promise.all([
-        dashboardService.getStats({ range: rangeFilter }),
+        dashboardService.getStats({ range: '30d' }),
         canViewTasks
           ? taskService.list(taskParams)
           : Promise.resolve({ data: { data: [] as DashboardTask[] } }),
@@ -332,7 +245,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [canViewProjects, canViewTasks, projectStatusFilter, rangeFilter, taskStatusFilter, user?.id])
+  }, [canViewProjects, canViewTasks, user?.id])
 
   useEffect(() => {
     void loadData()
@@ -524,8 +437,8 @@ export default function DashboardPage() {
                   {greeting()}, {user?.name?.split(' ')[0] || 'Tim'}.
                 </h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-white/78">
-                  Dashboard ini hanya menampilkan modul yang dapat Anda baca. Gunakan filter di bawah
-                  untuk menyempitkan periode, fokus modul, dan preview operasional yang tampil.
+                  Dashboard ini hanya menampilkan modul yang dapat Anda baca, dengan ringkasan
+                  operasional, finance, dan team yang bisa langsung dibuka dari setiap widget.
                 </p>
               </div>
 
@@ -543,65 +456,6 @@ export default function DashboardPage() {
                       : 'Clock In'}
                 </button>
               ) : null}
-            </div>
-
-            <div className="rounded-2xl border border-white/12 bg-white/10 p-4 backdrop-blur-sm">
-              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/68">
-                <Filter size={13} />
-                Dashboard filters
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <DashboardSelect
-                  label="Record period"
-                  value={rangeFilter}
-                  onChange={setRangeFilter}
-                  options={RANGE_OPTIONS}
-                />
-                {canViewTasks ? (
-                  <DashboardSelect
-                    label="Task preview"
-                    value={taskStatusFilter}
-                    onChange={setTaskStatusFilter}
-                    options={TASK_STATUS_OPTIONS}
-                  />
-                ) : null}
-                {canViewProjects ? (
-                  <DashboardSelect
-                    label="Project preview"
-                    value={projectStatusFilter}
-                    onChange={setProjectStatusFilter}
-                    options={PROJECT_STATUS_OPTIONS}
-                  />
-                ) : null}
-                {focusOptions.length > 1 ? (
-                  <DashboardSelect
-                    label="Dashboard focus"
-                    value={focusFilter}
-                    onChange={setFocusFilter}
-                    options={focusOptions}
-                  />
-                ) : null}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/72">
-                <span className="rounded-full border border-white/15 px-2.5 py-1">
-                  Range: {formatFilterLabel(RANGE_OPTIONS, rangeFilter)}
-                </span>
-                {canViewTasks ? (
-                  <span className="rounded-full border border-white/15 px-2.5 py-1">
-                    Tasks: {formatFilterLabel(TASK_STATUS_OPTIONS, taskStatusFilter)}
-                  </span>
-                ) : null}
-                {canViewProjects ? (
-                  <span className="rounded-full border border-white/15 px-2.5 py-1">
-                    Projects: {formatFilterLabel(PROJECT_STATUS_OPTIONS, projectStatusFilter)}
-                  </span>
-                ) : null}
-                {focusOptions.length > 1 ? (
-                  <span className="rounded-full border border-white/15 px-2.5 py-1">
-                    Focus: {formatFilterLabel(focusOptions, focusFilter)}
-                  </span>
-                ) : null}
-              </div>
             </div>
 
             {visibleSummaryTiles.length > 0 ? (
@@ -963,11 +817,7 @@ export default function DashboardPage() {
               <div className="card-header">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/50">Assignments</p>
-                  <span className="section-title">
-                    {taskStatusFilter === 'all'
-                      ? 'My tasks'
-                      : `My ${formatFilterLabel(TASK_STATUS_OPTIONS, taskStatusFilter).toLowerCase()} tasks`}
-                  </span>
+                  <span className="section-title">My tasks</span>
                 </div>
                 <Link to={tasksRoute} className="text-xs font-medium text-primary hover:underline">View all</Link>
               </div>
@@ -1013,11 +863,7 @@ export default function DashboardPage() {
               <div className="card-header">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/50">Pipeline</p>
-                  <span className="section-title">
-                    {projectStatusFilter === 'all'
-                      ? 'Project snapshot'
-                      : `${formatFilterLabel(PROJECT_STATUS_OPTIONS, projectStatusFilter)} projects`}
-                  </span>
+                  <span className="section-title">Project snapshot</span>
                 </div>
                 <Link to={projectsRoute} className="text-xs font-medium text-primary hover:underline">View all</Link>
               </div>
@@ -1042,22 +888,11 @@ export default function DashboardPage() {
       {!hasVisibleContent ? (
         <div className="card">
           <div className="card-body flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="text-base font-semibold text-gray-900">No dashboard widgets match the current filters.</div>
+            <div className="text-base font-semibold text-gray-900">No dashboard widgets are available.</div>
             <p className="max-w-md text-sm text-gray-500">
-              Reset the focus filter or choose a broader period to see modules you can access.
+              The modules shown here follow the current user permissions. Additional widgets will
+              appear automatically when access is granted.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setRangeFilter('30d')
-                setTaskStatusFilter('all')
-                setProjectStatusFilter('open')
-                setFocusFilter('all')
-              }}
-              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90"
-            >
-              Reset filters
-            </button>
           </div>
         </div>
       ) : null}
