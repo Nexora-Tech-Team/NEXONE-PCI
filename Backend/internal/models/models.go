@@ -172,7 +172,7 @@ type TaskKanbanColumn struct {
 	Title    string `gorm:"not null" json:"title"`
 	Status   string `gorm:"not null;index" json:"status"` // todo, in_progress, done, expired
 	Position int    `gorm:"default:0;index" json:"position"`
-	Tasks    []Task `json:"tasks,omitempty"`
+	Tasks    []Task `gorm:"foreignKey:KanbanColumnID" json:"tasks,omitempty"`
 }
 
 type Task struct {
