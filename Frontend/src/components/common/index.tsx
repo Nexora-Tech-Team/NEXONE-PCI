@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { formatNumber, parseNumber } from '@/utils/format'
-import { X, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Search, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import clsx from 'clsx'
 
 // ─── Modal ───────────────────────────────────────────
@@ -13,13 +13,39 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg'
 }
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+  useEffect(() => {
+    if (!open) return
+
+    const { body } = document
+    const previousOverflow = body.style.overflow
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open, onClose])
+
   if (!open) return null
   const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }
+  const titleId = `modal-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={clsx('modal', widths[size])}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={clsx('modal', widths[size])}
+      >
         <div className="modal-header">
-          <span className="font-semibold text-sm text-gray-900">{title}</span>
+          <span id={titleId} className="font-semibold text-sm text-gray-900">{title}</span>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded">
             <X size={16} />
           </button>
@@ -40,13 +66,13 @@ interface SearchInputProps {
 }
 export function SearchInput({ value, onChange, placeholder = 'Search...', className }: SearchInputProps) {
   return (
-    <div className={clsx('relative', className)}>
-      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className={clsx('relative w-full sm:w-auto', className)}>
+      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="input input-sm pl-7 w-40"
+        className="input input-sm h-10 w-full pl-9 sm:w-48 md:w-56"
       />
     </div>
   )
@@ -59,9 +85,9 @@ interface PageHeaderProps {
 }
 export function PageHeader({ title, actions }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-4">
+    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <h1 className="page-title">{title}</h1>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 md:justify-end">{actions}</div>}
     </div>
   )
 }
@@ -73,9 +99,9 @@ interface ToolbarProps {
 }
 export function Toolbar({ left, right }: ToolbarProps) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">{left}</div>
-      <div className="flex items-center gap-2">{right}</div>
+    <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-wrap items-center gap-2">{left}</div>
+      <div className="flex flex-wrap items-center gap-2 xl:justify-end">{right}</div>
     </div>
   )
 }
@@ -88,22 +114,32 @@ interface PaginationProps {
   onChange: (page: number) => void
 }
 export function Pagination({ page, total, limit, onChange }: PaginationProps) {
-  const totalPages = Math.ceil(total / limit)
+  const totalPages = Math.max(1, Math.ceil(total / limit))
   const start = (page - 1) * limit + 1
   const end = Math.min(page * limit, total)
+  const visiblePages = Array.from(
+    { length: Math.min(totalPages, 5) },
+    (_, index) => {
+      const offset = Math.min(Math.max(page - 3, 0), Math.max(totalPages - 5, 0))
+      return offset + index + 1
+    }
+  )
 
   return (
     <div className="pagination">
-      <span>{total > 0 ? `${start}-${end} / ${total}` : '0-0 / 0'}</span>
-      <div className="flex gap-1">
+      <span className="min-w-0 truncate">
+        {total > 0 ? `${start}-${end} of ${total}` : '0 results'}
+      </span>
+      <div className="flex items-center gap-1">
         <button
           className="page-btn"
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
+          aria-label="Previous page"
         >
           <ChevronLeft size={12} />
         </button>
-        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+        {visiblePages.map(p => (
           <button
             key={p}
             className={clsx('page-btn', p === page && 'active')}
@@ -116,6 +152,7 @@ export function Pagination({ page, total, limit, onChange }: PaginationProps) {
           className="page-btn"
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1)}
+          aria-label="Next page"
         >
           <ChevronRight size={12} />
         </button>
@@ -158,15 +195,29 @@ export function StatusBadge({ status }: { status: string }) {
 // ─── Loading ─────────────────────────────────────────
 export function Loading() {
   return (
-    <div className="flex items-center justify-center h-48">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="flex min-h-[12rem] flex-col items-center justify-center gap-3 text-center">
+      <div className="h-9 w-9 rounded-full border-[3px] border-primary/20 border-t-primary animate-spin" />
+      <div>
+        <p className="text-sm font-medium text-gray-700">Loading content</p>
+        <p className="text-xs text-gray-400">Please wait a moment…</p>
+      </div>
     </div>
   )
 }
 
 // ─── EmptyState ──────────────────────────────────────
 export function EmptyState({ message = 'No record found.' }: { message?: string }) {
-  return <div className="empty-state">{message}</div>
+  return (
+    <div className="empty-state">
+      <div className="empty-state__icon">
+        <Inbox size={18} />
+      </div>
+      <div className="space-y-1">
+        <p className="font-medium text-gray-700">Nothing to show yet</p>
+        <p>{message}</p>
+      </div>
+    </div>
+  )
 }
 
 // ─── ConfirmDialog ───────────────────────────────────
@@ -241,16 +292,18 @@ interface ViewTabsProps {
 }
 export function ViewTabs({ tabs, active, onChange }: ViewTabsProps) {
   return (
-    <div className="flex border-b border-gray-200 mb-4">
-      {tabs.map(tab => (
-        <button
-          key={tab.key}
-          onClick={() => onChange(tab.key)}
-          className={clsx('view-tab', active === tab.key && 'active')}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="mb-4 overflow-x-auto border-b border-gray-200">
+      <div className="flex min-w-max">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => onChange(tab.key)}
+            className={clsx('view-tab', active === tab.key && 'active')}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

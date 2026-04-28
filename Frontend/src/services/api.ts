@@ -124,7 +124,7 @@ export const paymentService = {
 
 // ─── Contracts ───────────────────────────────────────
 export const contractService = {
-  list: () => api.get('/contracts'),
+  list: (params?: any) => api.get('/contracts', { params }),
   create: (data: any) => api.post('/contracts', data),
   update: (id: number, data: any) => api.put(`/contracts/${id}`, data),
   delete: (id: number) => api.delete(`/contracts/${id}`),
@@ -152,6 +152,7 @@ export const teamService = {
   getMember: (id: number) => api.get(`/team/members/${id}`),
   createMember: (data: any) => api.post('/team/members', data),
   updateMember: (id: number, data: any) => api.put(`/team/members/${id}`, data),
+  setMemberStatus: (id: number, is_active: boolean) => api.patch(`/team/members/${id}/status`, { is_active }),
   resetPassword: (id: number, data?: { password?: string }) =>
     api.post(`/team/members/${id}/reset-password`, data ?? {}),
   listTimeCards: () => api.get('/team/timecards'),
@@ -166,7 +167,7 @@ export const teamService = {
 
 // ─── Orders ──────────────────────────────────────────
 export const orderService = {
-  list: () => api.get('/orders'),
+  list: (params?: any) => api.get('/orders', { params }),
   get: (id: number) => api.get(`/orders/${id}`),
   create: (data: any) => api.post('/orders', data),
   update: (id: number, data: any) => api.put(`/orders/${id}`, data),

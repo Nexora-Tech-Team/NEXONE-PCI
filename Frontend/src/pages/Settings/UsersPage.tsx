@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { teamService, roleService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, KeyRound, UserX, UserCheck } from 'lucide-react'
@@ -12,13 +12,51 @@ import { RootState } from '@/store'
 
 interface AppRole { id: number; name: string }
 
-const EMPTY_FORM = {
-  name: '', email: '', password: '', job_title: '', phone: '', role: 'member', app_role_id: '' as string | number,
+type UserRole = 'admin' | 'member'
+
+interface UserFormState {
+  name: string
+  email: string
+  password: string
+  job_title: string
+  phone: string
+  role: UserRole
+  app_role_id: string | number
+}
+
+interface UserEditState {
+  name: string
+  email: string
+  job_title: string
+  phone: string
+  role: UserRole
+  app_role_id: number | null
+}
+
+interface UserRow {
+  id: number
+  name: string
+  email: string
+  job_title?: string | null
+  phone?: string | null
+  role: UserRole
+  app_role_id?: number | null
+  is_active: boolean
+}
+
+const EMPTY_FORM: UserFormState = {
+  name: '',
+  email: '',
+  password: '',
+  job_title: '',
+  phone: '',
+  role: 'member',
+  app_role_id: '',
 }
 
 export default function UsersPage() {
   const currentUser = useSelector((s: RootState) => s.auth.user)
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<UserRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -30,9 +68,9 @@ export default function UsersPage() {
   const [showResetModal, setShowResetModal] = useState(false)
   const [deactivateId, setDeactivateId] = useState<number | null>(null)
 
-  const [editUser, setEditUser] = useState<any>(null)
-  const [form, setForm] = useState<any>(EMPTY_FORM)
-  const [editForm, setEditForm] = useState<any>({})
+  const [editUser, setEditUser] = useState<UserRow | null>(null)
+  const [form, setForm] = useState<UserFormState>(EMPTY_FORM)
+  const [editForm, setEditForm] = useState<UserEditState | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [resetUserId, setResetUserId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -41,7 +79,7 @@ export default function UsersPage() {
 
   const load = () => {
     setLoading(true)
-    teamService.listMembers({ page, limit: LIMIT, q: search })
+    teamService.listMembers({ page, limit: LIMIT, q: search, status: 'all' })
       .then(r => { setUsers(r.data.data || []); setTotal(r.data.total || 0) })
       .catch(() => toast.error('Failed to load users'))
       .finally(() => setLoading(false))
@@ -52,26 +90,28 @@ export default function UsersPage() {
     roleService.list().then(r => setAppRoles(r.data.data || [])).catch(() => {})
   }, [])
 
-  const set = (key: string, val: any) => setForm((f: any) => ({ ...f, [key]: val }))
-  const setE = (key: string, val: any) => setEditForm((f: any) => ({ ...f, [key]: val }))
+  const set = <K extends keyof UserFormState>(key: K, val: UserFormState[K]) => setForm((f) => ({ ...f, [key]: val }))
+  const setE = <K extends keyof UserEditState>(key: K, val: UserEditState[K]) => setEditForm((f) => (f ? { ...f, [key]: val } : f))
+
+  const normalizedCreatePayload = useMemo(() => ({
+    name: form.name.trim(),
+    email: form.email.trim().toLowerCase(),
+    password: form.password,
+    job_title: form.job_title.trim(),
+    phone: form.phone.trim(),
+    role: form.role,
+    app_role_id: form.role === 'member' && form.app_role_id ? Number(form.app_role_id) : null,
+  }), [form])
 
   const handleCreate = async () => {
-    if (!form.name.trim()) { toast.error('Name is required'); return }
-    if (!form.email.trim()) { toast.error('Email is required'); return }
-    if (!isValidEmail(form.email)) { toast.error('Invalid email format'); return }
+    if (!normalizedCreatePayload.name) { toast.error('Name is required'); return }
+    if (!normalizedCreatePayload.email) { toast.error('Email is required'); return }
+    if (!isValidEmail(normalizedCreatePayload.email)) { toast.error('Invalid email format'); return }
     if (form.password.length < 6) { toast.error('Password min 6 characters'); return }
     setSaving(true)
     try {
-      await teamService.createMember({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        job_title: form.job_title,
-        phone: form.phone,
-        role: form.role,
-        app_role_id: form.role === 'member' && form.app_role_id ? Number(form.app_role_id) : null,
-      })
-      toast.success(`User ${form.name} created!`)
+      await teamService.createMember(normalizedCreatePayload)
+      toast.success(`User ${normalizedCreatePayload.name} created!`)
       setShowAddModal(false)
       setForm(EMPTY_FORM)
       load()
@@ -81,15 +121,29 @@ export default function UsersPage() {
   }
 
   const handleEdit = async () => {
-    if (!editForm.name?.trim()) { toast.error('Name is required'); return }
-    if (editForm.email && !isValidEmail(editForm.email)) { toast.error('Invalid email format'); return }
+    if (!editUser || !editForm) { toast.error('User not found'); return }
+    const payload = {
+      name: editForm.name.trim(),
+      email: editForm.email.trim().toLowerCase(),
+      job_title: editForm.job_title.trim(),
+      phone: editForm.phone.trim(),
+      role: editForm.role,
+      app_role_id: editForm.role === 'member' ? editForm.app_role_id : null,
+    }
+    if (!payload.name) { toast.error('Name is required'); return }
+    if (!payload.email) { toast.error('Email is required'); return }
+    if (!isValidEmail(payload.email)) { toast.error('Invalid email format'); return }
     setSaving(true)
     try {
-      await teamService.updateMember(editUser.id, editForm)
+      await teamService.updateMember(editUser.id, payload)
       toast.success('User updated!')
       setShowEditModal(false)
+      setEditUser(null)
+      setEditForm(null)
       load()
-    } catch { toast.error('Failed to update user') }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to update user')
+    }
     finally { setSaving(false) }
   }
 
@@ -109,20 +163,31 @@ export default function UsersPage() {
   const handleDeactivate = async () => {
     if (!deactivateId) return
     const target = users.find(u => u.id === deactivateId)
+    if (!target) return
     try {
-      await teamService.updateMember(deactivateId, { is_active: !target?.is_active })
-      toast.success(target?.is_active ? 'User deactivated' : 'User activated')
+      await teamService.setMemberStatus(deactivateId, !target.is_active)
+      toast.success(target.is_active ? 'User deactivated' : 'User activated')
+      setDeactivateId(null)
       load()
-    } catch { toast.error('Failed to update user status') }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to update user status')
+    }
   }
 
-  const openEdit = (u: any) => {
+  const openEdit = (u: UserRow) => {
     setEditUser(u)
-    setEditForm({ name: u.name, email: u.email, job_title: u.job_title || '', phone: u.phone || '', role: u.role, app_role_id: u.app_role_id ?? '' })
+    setEditForm({
+      name: u.name,
+      email: u.email,
+      job_title: u.job_title || '',
+      phone: u.phone || '',
+      role: u.role,
+      app_role_id: u.app_role_id ?? null,
+    })
     setShowEditModal(true)
   }
 
-  const openReset = (u: any) => {
+  const openReset = (u: UserRow) => {
     setResetUserId(u.id)
     setNewPassword('')
     setShowResetModal(true)
@@ -257,7 +322,7 @@ export default function UsersPage() {
             <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+62..." />
           </Row>
           <Row label="Role">
-            <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
+            <select className="input" value={form.role} onChange={e => set('role', e.target.value as UserRole)}>
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
@@ -280,36 +345,36 @@ export default function UsersPage() {
         title="Edit user"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEdit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <Row label="Full Name *">
-            <input className="input" value={editForm.name || ''} onChange={e => setE('name', e.target.value)} />
-          </Row>
-          <Row label="Email">
-            <input className="input" type="email" value={editForm.email || ''} onChange={e => setE('email', e.target.value)} />
-          </Row>
-          <Row label="Job Title">
-            <input className="input" value={editForm.job_title || ''} onChange={e => setE('job_title', e.target.value)} />
-          </Row>
-          <Row label="Phone">
-            <input className="input" value={editForm.phone || ''} onChange={e => setE('phone', e.target.value)} />
-          </Row>
-          <Row label="Role">
-            <select className="input" value={editForm.role || 'member'} onChange={e => setE('role', e.target.value)}>
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-          </Row>
-          {(editForm.role || 'member') === 'member' && (
-            <Row label="App Role">
-              <select className="input" value={editForm.app_role_id ?? ''} onChange={e => setE('app_role_id', e.target.value ? Number(e.target.value) : null)}>
-                <option value="">— No specific role (full access) —</option>
-                {appRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
+             <button className="btn btn-secondary" onClick={() => { setShowEditModal(false); setEditUser(null); setEditForm(null) }}>Cancel</button>
+             <button className="btn btn-primary" onClick={handleEdit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+           </>
+         }
+       >
+         <div className="space-y-3">
+           <Row label="Full Name *">
+             <input className="input" value={editForm?.name || ''} onChange={e => setE('name', e.target.value)} />
+           </Row>
+           <Row label="Email *">
+             <input className="input" type="email" value={editForm?.email || ''} onChange={e => setE('email', e.target.value)} />
+           </Row>
+           <Row label="Job Title">
+             <input className="input" value={editForm?.job_title || ''} onChange={e => setE('job_title', e.target.value)} />
+           </Row>
+           <Row label="Phone">
+             <input className="input" value={editForm?.phone || ''} onChange={e => setE('phone', e.target.value)} />
+           </Row>
+           <Row label="Role">
+             <select className="input" value={editForm?.role || 'member'} onChange={e => setE('role', e.target.value as UserRole)}>
+               <option value="member">Member</option>
+               <option value="admin">Admin</option>
+             </select>
+           </Row>
+           {(editForm?.role || 'member') === 'member' && (
+             <Row label="App Role">
+               <select className="input" value={editForm?.app_role_id ?? ''} onChange={e => setE('app_role_id', e.target.value ? Number(e.target.value) : null)}>
+                 <option value="">— No specific role (full access) —</option>
+                 {appRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+               </select>
             </Row>
           )}
         </div>

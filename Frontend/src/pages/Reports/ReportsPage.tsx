@@ -131,8 +131,8 @@ export default function ReportsPage() {
               open_projects: projects.filter(p => p.owner_id === m.id && p.status === 'open').length,
               completed_projects: projects.filter(p => p.owner_id === m.id && p.status === 'completed').length,
               hold_projects: projects.filter(p => p.owner_id === m.id && p.status === 'hold').length,
-              open_tasks: mTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
-              completed_tasks: mTasks.filter(t => t.status === 'completed').length,
+              open_tasks: mTasks.filter(t => t.status !== 'done').length,
+              completed_tasks: mTasks.filter(t => t.status === 'done').length,
             }
           }).sort((a, b) => a.name.localeCompare(b.name))
 
@@ -158,8 +158,8 @@ export default function ReportsPage() {
               open_projects: cProjects.filter(p => p.status === 'open').length,
               completed_projects: cProjects.filter(p => p.status === 'completed').length,
               hold_projects: cProjects.filter(p => p.status === 'hold').length,
-              open_tasks: cTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
-              completed_tasks: cTasks.filter(t => t.status === 'completed').length,
+              open_tasks: cTasks.filter(t => t.status !== 'done').length,
+              completed_tasks: cTasks.filter(t => t.status === 'done').length,
             }
           }).sort((a, b) => a.name.localeCompare(b.name))
 

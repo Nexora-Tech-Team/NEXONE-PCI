@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,13 +144,15 @@ func (h *ClientHandler) List(c *gin.Context) {
 func (h *ClientHandler) Create(c *gin.Context) {
 	var client models.Client
 	if err := c.ShouldBindJSON(&client); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	if client.OwnerID == 0 {
 		client.OwnerID = getUserID(c)
 	}
 	if err := h.db.Create(&client).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	recordAudit(h.db, c, "create", "client", client.ID, client.Name)
 	c.JSON(http.StatusCreated, client)
@@ -157,7 +162,8 @@ func (h *ClientHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var client models.Client
 	if err := h.db.Preload("Owner").Preload("Contacts").Preload("Labels").First(&client, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Client not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Client not found"})
+		return
 	}
 	c.JSON(http.StatusOK, client)
 }
@@ -166,10 +172,12 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var client models.Client
 	if err := h.db.First(&client, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Client not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Client not found"})
+		return
 	}
 	if err := c.ShouldBindJSON(&client); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Save(&client)
 	recordAudit(h.db, c, "update", "client", client.ID, client.Name)
@@ -196,7 +204,8 @@ func (h *ClientHandler) AddContact(c *gin.Context) {
 	id, _ := getID(c)
 	var contact models.Contact
 	if err := c.ShouldBindJSON(&contact); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	contact.ClientID = id
 	h.db.Create(&contact)
@@ -207,7 +216,8 @@ func (h *ClientHandler) UpdateContact(c *gin.Context) {
 	contactID, _ := strconv.ParseUint(c.Param("contactId"), 10, 64)
 	var contact models.Contact
 	if err := h.db.First(&contact, contactID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Contact not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contact not found"})
+		return
 	}
 	c.ShouldBindJSON(&contact)
 	h.db.Save(&contact)
@@ -260,7 +270,8 @@ func (h *ProjectHandler) List(c *gin.Context) {
 func (h *ProjectHandler) Create(c *gin.Context) {
 	var project models.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&project)
 	recordAudit(h.db, c, "create", "project", project.ID, project.Title)
@@ -271,7 +282,8 @@ func (h *ProjectHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var project models.Project
 	if err := h.db.Preload("Client").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
 	}
 	c.JSON(http.StatusOK, project)
 }
@@ -280,7 +292,8 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var project models.Project
 	if err := h.db.First(&project, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.ShouldBindJSON(&project)
 	h.db.Save(&project)
@@ -340,7 +353,8 @@ func (h *TaskHandler) List(c *gin.Context) {
 func (h *TaskHandler) Create(c *gin.Context) {
 	var task models.Task
 	if err := c.ShouldBindJSON(&task); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&task)
 	recordAudit(h.db, c, "create", "task", task.ID, task.Title)
@@ -351,7 +365,8 @@ func (h *TaskHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var task models.Task
 	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Collaborators").First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
 	}
 	c.JSON(http.StatusOK, task)
 }
@@ -360,7 +375,8 @@ func (h *TaskHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var task models.Task
 	if err := h.db.First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.ShouldBindJSON(&task)
 	h.db.Save(&task)
@@ -370,7 +386,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 
 func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	id, _ := getID(c)
-	var req struct{ Status string `json:"status"` }
+	var req struct {
+		Status string `json:"status"`
+	}
 	c.ShouldBindJSON(&req)
 	h.db.Model(&models.Task{}).Where("id = ?", id).Update("status", req.Status)
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
@@ -411,7 +429,8 @@ func (h *LeadHandler) List(c *gin.Context) {
 func (h *LeadHandler) Create(c *gin.Context) {
 	var lead models.Lead
 	if err := c.ShouldBindJSON(&lead); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	lead.OwnerID = getUserID(c)
 	h.db.Create(&lead)
@@ -423,7 +442,8 @@ func (h *LeadHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var lead models.Lead
 	if err := h.db.Preload("Owner").First(&lead, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.JSON(http.StatusOK, lead)
 }
@@ -432,7 +452,8 @@ func (h *LeadHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var lead models.Lead
 	if err := h.db.First(&lead, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.ShouldBindJSON(&lead)
 	h.db.Save(&lead)
@@ -442,7 +463,9 @@ func (h *LeadHandler) Update(c *gin.Context) {
 
 func (h *LeadHandler) UpdateStatus(c *gin.Context) {
 	id, _ := getID(c)
-	var req struct{ Status string `json:"status"` }
+	var req struct {
+		Status string `json:"status"`
+	}
 	c.ShouldBindJSON(&req)
 	h.db.Model(&models.Lead{}).Where("id = ?", id).Update("status", req.Status)
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
@@ -461,7 +484,8 @@ func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 	id, _ := getID(c)
 	var lead models.Lead
 	if err := h.db.First(&lead, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
+		return
 	}
 	client := models.Client{
 		Name:    lead.Name,
@@ -470,7 +494,8 @@ func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 		OwnerID: getUserID(c),
 	}
 	if err := h.db.Create(&client).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Model(&lead).Update("status", "won")
 	recordAudit(h.db, c, "convert", "lead", lead.ID, lead.Name+" → Client")
@@ -504,7 +529,8 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 func (h *InvoiceHandler) Create(c *gin.Context) {
 	var invoice models.Invoice
 	if err := c.ShouldBindJSON(&invoice); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&invoice)
 	recordAudit(h.db, c, "create", "invoice", invoice.ID, invoice.InvoiceNumber)
@@ -515,7 +541,8 @@ func (h *InvoiceHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var invoice models.Invoice
 	if err := h.db.Preload("Client").Preload("Project").Preload("Items").Preload("Payments").First(&invoice, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.JSON(http.StatusOK, invoice)
 }
@@ -524,7 +551,8 @@ func (h *InvoiceHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var invoice models.Invoice
 	if err := h.db.First(&invoice, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.ShouldBindJSON(&invoice)
 	h.db.Save(&invoice)
@@ -545,7 +573,8 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 	id, _ := getID(c)
 	var invoice models.Invoice
 	if err := h.db.Preload("Client").Preload("Project").Preload("Items").Preload("Payments").First(&invoice, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 
 	tmpl := template.Must(template.New("invoice").Funcs(template.FuncMap{
@@ -553,7 +582,9 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 			return fmt.Sprintf("%s %.2f", currency, amount)
 		},
 		"formatDate": func(t models.FlexTime) string {
-			if t.IsZero() { return "-" }
+			if t.IsZero() {
+				return "-"
+			}
 			return t.Format("02 January 2006")
 		},
 	}).Parse(invoicePDFTemplate))
@@ -695,7 +726,8 @@ func (h *InvoiceHandler) AddPayment(c *gin.Context) {
 	id, _ := getID(c)
 	var payment models.Payment
 	if err := c.ShouldBindJSON(&payment); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	payment.InvoiceID = id
 	h.db.Create(&payment)
@@ -707,7 +739,8 @@ func (h *InvoiceHandler) AddItem(c *gin.Context) {
 	id, _ := getID(c)
 	var item models.InvoiceItem
 	if err := c.ShouldBindJSON(&item); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	item.InvoiceID = id
 	item.Total = item.Quantity * item.UnitPrice
@@ -721,7 +754,8 @@ func (h *InvoiceHandler) UpdateItem(c *gin.Context) {
 	itemID, _ := strconv.ParseUint(c.Param("itemId"), 10, 64)
 	var item models.InvoiceItem
 	if err := h.db.Where("id = ? AND invoice_id = ?", itemID, invoiceID).First(&item).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.ShouldBindJSON(&item)
 	item.Total = item.Quantity * item.UnitPrice
@@ -743,7 +777,8 @@ func (h *InvoiceHandler) DeletePayment(c *gin.Context) {
 	paymentID, _ := strconv.ParseUint(c.Param("paymentId"), 10, 64)
 	var payment models.Payment
 	if err := h.db.Where("id = ? AND invoice_id = ?", paymentID, invoiceID).First(&payment).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	h.db.Delete(&payment)
 	h.recalcInvoice(invoiceID)
@@ -776,11 +811,11 @@ func (h *InvoiceHandler) recalcInvoice(invoiceID uint) {
 
 func (h *InvoiceHandler) Summary(c *gin.Context) {
 	var summary []struct {
-		ClientName    string  `json:"client_name"`
-		Count         int     `json:"count"`
-		InvoiceTotal  float64 `json:"invoice_total"`
+		ClientName      string  `json:"client_name"`
+		Count           int     `json:"count"`
+		InvoiceTotal    float64 `json:"invoice_total"`
 		PaymentReceived float64 `json:"payment_received"`
-		Due           float64 `json:"due"`
+		Due             float64 `json:"due"`
 	}
 	h.db.Table("invoices i").
 		Select("c.name as client_name, COUNT(i.id) as count, SUM(i.total_amount) as invoice_total, SUM(i.paid_amount) as payment_received, SUM(i.due_amount) as due").
@@ -802,9 +837,15 @@ func (h *PaymentHandler) List(c *gin.Context) {
 	var total int64
 	q := c.Query("q")
 	query := h.db.Preload("Invoice.Client").Order("payment_date desc")
+	needsInvoiceJoin := c.Query("client_id") != "" || q != ""
+	if needsInvoiceJoin {
+		query = query.Joins("JOIN invoices ON invoices.id = payments.invoice_id")
+	}
+	if clientID := c.Query("client_id"); clientID != "" {
+		query = query.Where("invoices.client_id = ?", clientID)
+	}
 	if q != "" {
-		query = query.Joins("JOIN invoices ON invoices.id = payments.invoice_id").
-			Joins("LEFT JOIN clients ON clients.id = invoices.client_id").
+		query = query.Joins("LEFT JOIN clients ON clients.id = invoices.client_id").
 			Where("invoices.invoice_number ILIKE ? OR clients.name ILIKE ? OR payments.payment_method ILIKE ? OR payments.note ILIKE ?",
 				"%"+q+"%", "%"+q+"%", "%"+q+"%", "%"+q+"%")
 	}
@@ -817,7 +858,8 @@ func (h *PaymentHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var payment models.Payment
 	if err := h.db.Preload("Invoice").First(&payment, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.JSON(http.StatusOK, payment)
 }
@@ -831,15 +873,20 @@ func NewContractHandler(db *gorm.DB) *ContractHandler { return &ContractHandler{
 func (h *ContractHandler) List(c *gin.Context) {
 	var contracts []models.Contract
 	var total int64
-	h.db.Model(&models.Contract{}).Count(&total)
-	h.db.Preload("Client").Preload("Project").Find(&contracts)
+	query := h.db.Model(&models.Contract{}).Preload("Client").Preload("Project")
+	if clientID := c.Query("client_id"); clientID != "" {
+		query = query.Where("client_id = ?", clientID)
+	}
+	query.Count(&total)
+	query.Find(&contracts)
 	c.JSON(http.StatusOK, gin.H{"data": contracts, "total": total})
 }
 
 func (h *ContractHandler) Create(c *gin.Context) {
 	var contract models.Contract
 	if err := c.ShouldBindJSON(&contract); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&contract)
 	recordAudit(h.db, c, "create", "contract", contract.ID, contract.Title)
@@ -850,7 +897,8 @@ func (h *ContractHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var contract models.Contract
 	if err := h.db.Preload("Client").Preload("Project").First(&contract, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
 	}
 	c.JSON(http.StatusOK, contract)
 }
@@ -891,7 +939,8 @@ func (h *ItemHandler) List(c *gin.Context) {
 func (h *ItemHandler) Create(c *gin.Context) {
 	var item models.Item
 	if err := c.ShouldBindJSON(&item); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&item)
 	c.JSON(http.StatusCreated, item)
@@ -921,15 +970,20 @@ func NewOrderHandler(db *gorm.DB) *OrderHandler { return &OrderHandler{db: db} }
 func (h *OrderHandler) List(c *gin.Context) {
 	var orders []models.Order
 	var total int64
-	h.db.Model(&models.Order{}).Count(&total)
-	h.db.Preload("Client").Find(&orders)
+	query := h.db.Model(&models.Order{}).Preload("Client")
+	if clientID := c.Query("client_id"); clientID != "" {
+		query = query.Where("client_id = ?", clientID)
+	}
+	query.Count(&total)
+	query.Find(&orders)
 	c.JSON(http.StatusOK, gin.H{"data": orders, "total": total})
 }
 
 func (h *OrderHandler) Create(c *gin.Context) {
 	var order models.Order
 	if err := c.ShouldBindJSON(&order); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&order)
 	c.JSON(http.StatusCreated, order)
@@ -949,6 +1003,17 @@ func (h *OrderHandler) Update(c *gin.Context) {
 	c.ShouldBindJSON(&order)
 	h.db.Save(&order)
 	c.JSON(http.StatusOK, order)
+}
+
+func (h *OrderHandler) Delete(c *gin.Context) {
+	id, _ := getID(c)
+	var order models.Order
+	if err := h.db.First(&order, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
+	}
+	h.db.Delete(&order)
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
 // ─── EVENT ───────────────────────────────────────────
@@ -973,7 +1038,8 @@ func (h *EventHandler) List(c *gin.Context) {
 func (h *EventHandler) Create(c *gin.Context) {
 	var event models.Event
 	if err := c.ShouldBindJSON(&event); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	event.CreatedByID = getUserID(c)
 	h.db.Create(&event)
@@ -1018,7 +1084,8 @@ func (h *NoteHandler) List(c *gin.Context) {
 func (h *NoteHandler) Create(c *gin.Context) {
 	var note models.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	note.UserID = getUserID(c)
 	h.db.Create(&note)
@@ -1059,7 +1126,8 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 func (h *ExpenseHandler) Create(c *gin.Context) {
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	expense.UserID = getUserID(c)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
@@ -1089,6 +1157,66 @@ type TeamHandler struct{ db *gorm.DB }
 
 func NewTeamHandler(db *gorm.DB) *TeamHandler { return &TeamHandler{db: db} }
 
+type optionalUint struct {
+	Set   bool
+	Value *uint
+}
+
+func (o *optionalUint) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	raw := strings.TrimSpace(string(data))
+	if raw == "" || raw == "null" {
+		o.Value = nil
+		return nil
+	}
+
+	var num uint
+	if err := json.Unmarshal(data, &num); err == nil {
+		o.Value = &num
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		str = strings.TrimSpace(str)
+		if str == "" {
+			o.Value = nil
+			return nil
+		}
+		parsed, err := strconv.ParseUint(str, 10, 64)
+		if err != nil {
+			return fmt.Errorf("app_role_id must be a valid number")
+		}
+		value := uint(parsed)
+		o.Value = &value
+		return nil
+	}
+
+	return fmt.Errorf("app_role_id must be null or a valid number")
+}
+
+func (h *TeamHandler) appRoleExists(id *uint) bool {
+	if id == nil {
+		return true
+	}
+	var count int64
+	h.db.Model(&models.AppRole{}).Where("id = ?", *id).Count(&count)
+	return count > 0
+}
+
+func generateTemporaryPassword(length int) (string, error) {
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%"
+	password := make([]byte, length)
+	for i := range password {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		password[i] = charset[n.Int64()]
+	}
+	return string(password), nil
+}
+
 func (h *TeamHandler) CreateMember(c *gin.Context) {
 	var req struct {
 		Name      string `json:"name" binding:"required"`
@@ -1096,7 +1224,7 @@ func (h *TeamHandler) CreateMember(c *gin.Context) {
 		Password  string `json:"password" binding:"required,min=6"`
 		JobTitle  string `json:"job_title"`
 		Phone     string `json:"phone"`
-		Role      string `json:"role"`
+		Role      string `json:"role" binding:"omitempty,oneof=admin member"`
 		AppRoleID *uint  `json:"app_role_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1112,6 +1240,10 @@ func (h *TeamHandler) CreateMember(c *gin.Context) {
 	if req.Role == "admin" {
 		role = "admin"
 		req.AppRoleID = nil
+	}
+	if !h.appRoleExists(req.AppRoleID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Selected app role was not found"})
+		return
 	}
 
 	var count int64
@@ -1149,35 +1281,192 @@ func (h *TeamHandler) CreateMember(c *gin.Context) {
 }
 
 func (h *TeamHandler) ListMembers(c *gin.Context) {
+	hasPage := c.Query("page") != ""
+	hasLimit := c.Query("limit") != ""
+
+	var q struct {
+		PaginationQuery
+		Status          string `form:"status"`
+		IncludeInactive bool   `form:"include_inactive"`
+	}
+	c.ShouldBindQuery(&q)
+	if hasPage && q.Page <= 0 {
+		q.Page = 1
+	}
+	if hasLimit && q.Limit <= 0 {
+		q.Limit = 10
+	}
+
 	var members []models.User
 	var total int64
-	active := c.Query("inactive") != "true"
-	h.db.Model(&models.User{}).Where("is_active = ?", active).Count(&total)
-	h.db.Where("is_active = ?", active).Order("name asc").Find(&members)
-	c.JSON(http.StatusOK, gin.H{"data": members, "total": total})
+	query := h.db.Model(&models.User{})
+
+	switch {
+	case q.Status == "all" || q.IncludeInactive:
+	case q.Status == "inactive" || c.Query("inactive") == "true":
+		query = query.Where("is_active = ?", false)
+	default:
+		query = query.Where("is_active = ?", true)
+	}
+
+	if search := strings.TrimSpace(q.Q); search != "" {
+		like := "%" + search + "%"
+		query = query.Where("name ILIKE ? OR email ILIKE ? OR job_title ILIKE ?", like, like, like)
+	}
+
+	query.Count(&total)
+	query = query.Order("name asc")
+	if hasLimit || hasPage {
+		if q.Page <= 0 {
+			q.Page = 1
+		}
+		if q.Limit <= 0 {
+			q.Limit = 10
+		}
+		query = query.Scopes(paginate(q.PaginationQuery))
+	}
+	query.Find(&members)
+	c.JSON(http.StatusOK, gin.H{"data": members, "total": total, "page": q.Page, "limit": q.Limit})
 }
 
 func (h *TeamHandler) GetMember(c *gin.Context) {
 	id, _ := getID(c)
 	var member models.User
-	h.db.First(&member, id)
+	if err := h.db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
 	c.JSON(http.StatusOK, member)
 }
 
 func (h *TeamHandler) UpdateMember(c *gin.Context) {
 	id, _ := getID(c)
 	var member models.User
+	if err := h.db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var req struct {
+		Name      *string      `json:"name"`
+		Email     *string      `json:"email" binding:"omitempty,email"`
+		JobTitle  *string      `json:"job_title"`
+		Phone     *string      `json:"phone"`
+		Role      *string      `json:"role" binding:"omitempty,oneof=admin member"`
+		AppRoleID optionalUint `json:"app_role_id"`
+		IsActive  *bool        `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{}
+
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+			return
+		}
+		updates["name"] = name
+	}
+
+	if req.Email != nil {
+		email := strings.ToLower(strings.TrimSpace(*req.Email))
+		if email == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+			return
+		}
+		var count int64
+		h.db.Model(&models.User{}).Where("id <> ? AND email = ?", member.ID, email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+			return
+		}
+		updates["email"] = email
+	}
+
+	if req.JobTitle != nil {
+		updates["job_title"] = strings.TrimSpace(*req.JobTitle)
+	}
+	if req.Phone != nil {
+		updates["phone"] = strings.TrimSpace(*req.Phone)
+	}
+
+	nextRole := member.Role
+	if req.Role != nil {
+		nextRole = strings.TrimSpace(*req.Role)
+		updates["role"] = nextRole
+		if nextRole == "admin" {
+			updates["app_role_id"] = nil
+		}
+	}
+
+	if req.AppRoleID.Set && nextRole != "admin" {
+		if !h.appRoleExists(req.AppRoleID.Value) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected app role was not found"})
+			return
+		}
+		updates["app_role_id"] = req.AppRoleID.Value
+	}
+
+	if req.IsActive != nil {
+		if member.ID == getUserID(c) && !*req.IsActive {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "You cannot deactivate your own account"})
+			return
+		}
+		updates["is_active"] = *req.IsActive
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusOK, gin.H{"user": userPayload(member), "permissions": resolvePermissions(h.db, member)})
+		return
+	}
+
+	if err := h.db.Model(&member).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
 	h.db.First(&member, id)
-	c.ShouldBindJSON(&member)
-	h.db.Save(&member)
-	c.JSON(http.StatusOK, member)
+	recordAudit(h.db, c, "update", "user", member.ID, member.Name)
+	c.JSON(http.StatusOK, gin.H{"user": userPayload(member), "permissions": resolvePermissions(h.db, member)})
+}
+
+func (h *TeamHandler) UpdateMemberStatus(c *gin.Context) {
+	id, _ := getID(c)
+	var member models.User
+	if err := h.db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var req struct {
+		IsActive *bool `json:"is_active" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if member.ID == getUserID(c) && !*req.IsActive {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You cannot deactivate your own account"})
+		return
+	}
+	if err := h.db.Model(&member).Update("is_active", *req.IsActive).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user status"})
+		return
+	}
+	member.IsActive = *req.IsActive
+	recordAudit(h.db, c, "update_status", "user", member.ID, member.Name)
+	c.JSON(http.StatusOK, gin.H{"user": userPayload(member), "permissions": resolvePermissions(h.db, member)})
 }
 
 func (h *TeamHandler) DeleteMember(c *gin.Context) {
 	id, _ := getID(c)
 	var member models.User
 	if err := h.db.First(&member, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
 	}
 	h.db.Model(&member).Update("is_active", false)
 	c.JSON(http.StatusOK, gin.H{"message": "User deactivated"})
@@ -1185,20 +1474,45 @@ func (h *TeamHandler) DeleteMember(c *gin.Context) {
 
 func (h *TeamHandler) ResetPassword(c *gin.Context) {
 	id, _ := getID(c)
+	var member models.User
+	if err := h.db.First(&member, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
 	var req struct {
-		Password string `json:"password" binding:"required,min=6"`
+		Password string `json:"password" binding:"omitempty,min=6"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+
+	password := strings.TrimSpace(req.Password)
+	if password == "" {
+		var err error
+		password, err = generateTemporaryPassword(12)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate temporary password"})
+			return
+		}
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
 	}
 	if err := h.db.Model(&models.User{}).Where("id = ?", id).Update("password", string(hashed)).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+	recordAudit(h.db, c, "reset_password", "user", member.ID, member.Name)
+	c.JSON(http.StatusOK, gin.H{
+		"message":            "Password reset successfully",
+		"temp_password":      password,
+		"temporary_password": password,
+	})
 }
 
 func (h *TeamHandler) ListTimeCards(c *gin.Context) {
@@ -1212,7 +1526,8 @@ func (h *TeamHandler) ClockIn(c *gin.Context) {
 	var existing models.TimeCard
 	// Check if already clocked in
 	if err := h.db.Where("user_id = ? AND out_time IS NULL", userID).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Already clocked in"}); return
+		c.JSON(http.StatusConflict, gin.H{"error": "Already clocked in"})
+		return
 	}
 	now := time.Now()
 	card := models.TimeCard{UserID: userID, InTime: now, InDate: now}
@@ -1225,7 +1540,8 @@ func (h *TeamHandler) ClockOut(c *gin.Context) {
 	userID := getUserID(c)
 	var card models.TimeCard
 	if err := h.db.Where("user_id = ? AND out_time IS NULL", userID).First(&card).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No active clock-in found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active clock-in found"})
+		return
 	}
 	now := time.Now()
 	duration := now.Sub(card.InTime).Hours()
@@ -1248,7 +1564,8 @@ func (h *TeamHandler) ListLeaves(c *gin.Context) {
 func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 	var leave models.Leave
 	if err := c.ShouldBindJSON(&leave); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	leave.UserID = getUserID(c)
 	leave.Status = "pending"
@@ -1258,7 +1575,9 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 
 func (h *TeamHandler) UpdateLeaveStatus(c *gin.Context) {
 	id, _ := getID(c)
-	var req struct{ Status string `json:"status"` }
+	var req struct {
+		Status string `json:"status"`
+	}
 	c.ShouldBindJSON(&req)
 	h.db.Model(&models.Leave{}).Where("id = ?", id).Update("status", req.Status)
 	c.JSON(http.StatusOK, gin.H{"message": "Updated"})
@@ -1273,7 +1592,8 @@ func (h *TeamHandler) ListAnnouncements(c *gin.Context) {
 func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
 	var ann models.Announcement
 	if err := c.ShouldBindJSON(&ann); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	ann.CreatedByID = getUserID(c)
 	h.db.Create(&ann)
@@ -1309,7 +1629,8 @@ func (h *FileHandler) List(c *gin.Context) {
 func (h *FileHandler) Upload(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
+		return
 	}
 	defer file.Close()
 
@@ -1317,7 +1638,8 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	subDir := time.Now().Format("2006/01")
 	dir := filepath.Join(h.uploadDir, subDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload dir"}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload dir"})
+		return
 	}
 
 	// Nama file unik: timestamp + nama asli
@@ -1327,11 +1649,13 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	dst, err := os.Create(fullPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+		return
 	}
 	defer dst.Close()
 	if _, err = io.Copy(dst, file); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write file"}); return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write file"})
+		return
 	}
 
 	f := models.File{
@@ -1341,6 +1665,12 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		Size:     header.Size,
 		MimeType: header.Header.Get("Content-Type"),
 		OwnerID:  getUserID(c),
+	}
+	if folderID := strings.TrimSpace(c.PostForm("folder_id")); folderID != "" {
+		if parsed, err := strconv.ParseUint(folderID, 10, 64); err == nil {
+			id := uint(parsed)
+			f.FolderID = &id
+		}
 	}
 	h.db.Create(&f)
 	// Update URL dengan ID yang sudah ada
@@ -1353,13 +1683,16 @@ func (h *FileHandler) Download(c *gin.Context) {
 	userID := getUserID(c)
 	var f models.File
 	if err := h.db.First(&f, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
 	}
 	if f.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"}); return
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
 	}
 	if f.IsFolder || f.Path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Not a downloadable file"}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Not a downloadable file"})
+		return
 	}
 	fullPath := filepath.Join(h.uploadDir, f.Path)
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, f.Name))
@@ -1369,7 +1702,8 @@ func (h *FileHandler) Download(c *gin.Context) {
 func (h *FileHandler) CreateFolder(c *gin.Context) {
 	var folder models.File
 	if err := c.ShouldBindJSON(&folder); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	folder.IsFolder = true
 	folder.OwnerID = getUserID(c)
@@ -1408,7 +1742,8 @@ func (h *TodoHandler) List(c *gin.Context) {
 func (h *TodoHandler) Create(c *gin.Context) {
 	var todo models.Todo
 	if err := c.ShouldBindJSON(&todo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	todo.UserID = getUserID(c)
 	h.db.Create(&todo)
@@ -1498,7 +1833,8 @@ func (h *LabelHandler) List(c *gin.Context) {
 func (h *LabelHandler) Create(c *gin.Context) {
 	var label models.Label
 	if err := c.ShouldBindJSON(&label); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Create(&label)
 	c.JSON(http.StatusCreated, label)
@@ -1525,10 +1861,12 @@ func (h *AppRoleHandler) List(c *gin.Context) {
 func (h *AppRoleHandler) Create(c *gin.Context) {
 	var role models.AppRole
 	if err := c.ShouldBindJSON(&role); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	if err := h.db.Create(&role).Error; err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"}); return
+		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
+		return
 	}
 	c.JSON(http.StatusCreated, role)
 }
@@ -1537,7 +1875,8 @@ func (h *AppRoleHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var role models.AppRole
 	if err := h.db.Preload("Permissions").First(&role, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
 	}
 	c.JSON(http.StatusOK, role)
 }
@@ -1546,14 +1885,17 @@ func (h *AppRoleHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
 	var role models.AppRole
 	if err := h.db.First(&role, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
 	}
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
 	c.ShouldBindJSON(&req)
-	if req.Name != "" { role.Name = req.Name }
+	if req.Name != "" {
+		role.Name = req.Name
+	}
 	role.Description = req.Description
 	h.db.Save(&role)
 	c.JSON(http.StatusOK, role)
@@ -1564,7 +1906,8 @@ func (h *AppRoleHandler) Delete(c *gin.Context) {
 	var count int64
 	h.db.Model(&models.User{}).Where("app_role_id = ?", id).Count(&count)
 	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Role masih digunakan oleh %d user", count)}); return
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Role masih digunakan oleh %d user", count)})
+		return
 	}
 	h.db.Delete(&models.AppRole{}, id)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
@@ -1574,11 +1917,13 @@ func (h *AppRoleHandler) SetPermissions(c *gin.Context) {
 	id, _ := getID(c)
 	var role models.AppRole
 	if err := h.db.First(&role, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"}); return
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
 	}
 	var permissions []models.RolePermission
 	if err := c.ShouldBindJSON(&permissions); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	// Replace all permissions for this role
 	h.db.Where("app_role_id = ?", id).Delete(&models.RolePermission{})
@@ -1676,7 +2021,9 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"Tanggal", "Kategori", "Judul", "Jumlah", "Pajak", "Total", "User"})
 		for _, e := range expenses {
 			userName := ""
-			if e.User != nil { userName = e.User.Name }
+			if e.User != nil {
+				userName = e.User.Name
+			}
 			w.Write([]string{e.Date.Format("2006-01-02"), e.Category, e.Title, fmt.Sprintf("%.2f", e.Amount), fmt.Sprintf("%.2f", e.Tax), fmt.Sprintf("%.2f", e.Total), userName})
 		}
 
@@ -1686,7 +2033,9 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"Nama", "Kontak", "Email", "Status", "Sumber", "Owner", "Tanggal Dibuat"})
 		for _, l := range leads {
 			ownerName := ""
-			if l.Owner != nil { ownerName = l.Owner.Name }
+			if l.Owner != nil {
+				ownerName = l.Owner.Name
+			}
 			w.Write([]string{l.Name, l.PrimaryContact, l.Email, l.Status, l.Source, ownerName, l.CreatedAt.Format("2006-01-02")})
 		}
 
@@ -1696,7 +2045,9 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"Proyek", "Klien", "Status", "Progress", "Mulai", "Deadline", "Nilai"})
 		for _, p := range projects {
 			clientName := ""
-			if p.Client != nil { clientName = p.Client.Name }
+			if p.Client != nil {
+				clientName = p.Client.Name
+			}
 			w.Write([]string{p.Title, clientName, p.Status, strconv.Itoa(p.Progress) + "%", p.StartDate.Format("2006-01-02"), p.Deadline.Format("2006-01-02"), fmt.Sprintf("%.2f", p.Price)})
 		}
 
@@ -1710,9 +2061,13 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"Nama", "Tanggal", "Jam Masuk", "Jam Keluar", "Durasi (jam)"})
 		for _, tc := range cards {
 			userName := ""
-			if tc.User != nil { userName = tc.User.Name }
+			if tc.User != nil {
+				userName = tc.User.Name
+			}
 			outTime := "-"
-			if tc.OutTime != nil { outTime = tc.OutTime.Format("15:04") }
+			if tc.OutTime != nil {
+				outTime = tc.OutTime.Format("15:04")
+			}
 			w.Write([]string{userName, tc.InDate.Format("2006-01-02"), tc.InTime.Format("15:04"), outTime, fmt.Sprintf("%.2f", tc.Duration)})
 		}
 

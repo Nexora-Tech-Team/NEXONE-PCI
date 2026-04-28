@@ -28,18 +28,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex min-h-screen flex-col bg-slate-100 lg:flex-row">
 
       {/* ── Left panel ─────────────────────────────── */}
-      <div className="w-full lg:w-[30%] flex flex-col bg-white relative">
+      <div className="relative flex min-h-screen w-full flex-col bg-white lg:w-[30%]">
 
         {/* Logo Nexora Part — center top, overlapping */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20">
-          <img src={nexoraPartUrl} alt="Nexora" className="h-[288px] w-auto object-contain" />
+        <div className="z-20 flex items-center justify-center px-6 pt-8 lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2 lg:px-0 lg:pt-0">
+          <img src={nexoraPartUrl} alt="Nexora" className="h-28 w-auto object-contain sm:h-36 lg:h-[288px]" />
         </div>
 
         {/* Form — vertically centered */}
-        <div className="flex flex-col flex-1 justify-center px-16 py-12">
+        <div className="flex flex-1 flex-col justify-center px-6 pb-10 pt-6 sm:px-10 lg:px-16 lg:py-12">
           <div className="w-full max-w-[420px]">
 
             {/* Heading */}
@@ -155,7 +155,7 @@ export default function LoginPage() {
         </div>
 
         {/* Copyright — bottom fixed */}
-        <div className="px-16 pb-8">
+        <div className="px-6 pb-8 sm:px-10 lg:px-16">
           <p className="text-[11px] text-gray-300">© 2026 NEXORA. All rights reserved.</p>
         </div>
 

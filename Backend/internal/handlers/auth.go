@@ -228,6 +228,7 @@ func userPayload(user models.User) gin.H {
 		"role":        user.Role,
 		"app_role_id": user.AppRoleID,
 		"avatar":      user.Avatar,
+		"is_active":   user.IsActive,
 		"clocked_in":  user.ClockedIn,
 	}
 }

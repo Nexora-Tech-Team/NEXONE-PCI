@@ -1,9 +1,9 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RootState, AppDispatch } from '@/store'
 import { logoutAsync, canRead } from '@/store/slices/authSlice'
-import { toggleSidebar } from '@/store/slices/uiSlice'
+import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
@@ -128,6 +128,12 @@ export default function Layout() {
     return active ? [active.id] : ['business']
   })
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(() => (
+    typeof window !== 'undefined'
+      ? window.matchMedia('(min-width: 1024px)').matches
+      : true
+  ))
+  const profileRef = useRef<HTMLDivElement>(null)
 
   const titleMap = [
     { key: '/dashboard', label: 'Dashboard' },
@@ -165,6 +171,69 @@ export default function Layout() {
     setExpanded(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
+  useEffect(() => {
+    const activeGroup = navGroups.find(group =>
+      group.items.some(item => location.pathname.startsWith(item.to))
+    )
+
+    if (activeGroup) {
+      setExpanded(prev => prev.includes(activeGroup.id) ? prev : [...prev, activeGroup.id])
+    }
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const media = window.matchMedia('(min-width: 1024px)')
+    const syncSidebar = (matches: boolean) => {
+      setIsDesktop(matches)
+      dispatch(setSidebar(matches))
+    }
+
+    syncSidebar(media.matches)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncSidebar(event.matches)
+    }
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange)
+      return () => media.removeEventListener('change', handleChange)
+    }
+
+    media.addListener(handleChange)
+    return () => media.removeListener(handleChange)
+  }, [dispatch])
+
+  useEffect(() => {
+    if (!isDesktop) {
+      dispatch(setSidebar(false))
+      setProfileOpen(false)
+    }
+  }, [dispatch, isDesktop, location.pathname])
+
+  useEffect(() => {
+    if (!profileOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [profileOpen])
+
   // Call the backend logout endpoint so the JWT JTI is added to the
   // server-side blacklist, then clear local state via the Redux thunk.
   const handleLogout = async () => {
@@ -187,7 +256,7 @@ export default function Layout() {
       )}
 
       <aside className={clsx(
-        'fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-white/10 bg-primary shadow-2xl transition-transform duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-white/10 bg-primary shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
@@ -301,11 +370,15 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className={clsx('flex flex-col min-w-0 flex-1 transition-[margin] duration-300 ease-in-out', sidebarOpen ? 'ml-72' : 'ml-0')}>
-        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-gray-200 bg-white/95 px-5 shadow-sm backdrop-blur lg:px-7">
+      <div className={clsx(
+        'flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-in-out',
+        sidebarOpen ? 'ml-0 lg:ml-72' : 'ml-0'
+      )}>
+        <header className="sticky top-0 z-30 flex min-h-[72px] flex-wrap items-center gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur sm:px-5 lg:flex-nowrap lg:px-7">
           <button
             onClick={() => dispatch(toggleSidebar())}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100"
+            aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
           >
             <Menu size={18} />
           </button>
@@ -315,14 +388,18 @@ export default function Layout() {
             <h1 className="truncate text-xl font-semibold text-gray-800">{pageTitle}</h1>
           </div>
 
-          <div className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-400 md:flex">
+          <div className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-400 lg:flex">
             <Search size={16} />
             <span className="min-w-[120px]">Search modules...</span>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
             {[Search, Plus, Globe, Clock, Bell].map((Icon, i) => (
-              <button key={i} className="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 md:hidden">
+              <button
+                key={i}
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 lg:hidden"
+                aria-label={`Open ${['search', 'quick add', 'language', 'time', 'notifications'][i]} panel`}
+              >
                 <Icon size={16} />
                 {i === 4 && (
                   <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
@@ -330,18 +407,24 @@ export default function Layout() {
               </button>
             ))}
             {[Plus, Globe, Clock, Bell].map((Icon, i) => (
-              <button key={i} className="relative hidden h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 md:flex">
+              <button
+                key={i}
+                className="relative hidden h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 lg:flex"
+                aria-label={`Open ${['quick add', 'language', 'time', 'notifications'][i]} panel`}
+              >
                 <Icon size={16} />
-                {i === 4 && (
+                {i === 3 && (
                   <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
                 )}
               </button>
             ))}
 
-            <div className="relative ml-1">
+            <div ref={profileRef} className="relative ml-1">
               <button
                 onClick={() => setProfileOpen(prev => !prev)}
                 className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-colors hover:bg-gray-50"
+                aria-expanded={profileOpen}
+                aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
                   <img src={nexoraLogoUrl} alt="Nexora" className="h-7 w-auto object-contain" />
@@ -373,7 +456,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>

@@ -169,6 +169,7 @@ func (s *Server) setupRoutes() {
 			orders.POST("", orderH.Create)
 			orders.GET("/:id", orderH.Get)
 			orders.PUT("/:id", orderH.Update)
+			orders.DELETE("/:id", orderH.Delete)
 		}
 
 		// Events
@@ -210,6 +211,7 @@ func (s *Server) setupRoutes() {
 			team.GET("/members/:id", teamH.GetMember)
 			team.POST("/members", middleware.AdminRequired(), teamH.CreateMember)
 			team.PUT("/members/:id", middleware.AdminRequired(), teamH.UpdateMember)
+			team.PATCH("/members/:id/status", middleware.AdminRequired(), teamH.UpdateMemberStatus)
 			team.DELETE("/members/:id", middleware.AdminRequired(), teamH.DeleteMember)
 			team.POST("/members/:id/reset-password", middleware.AdminRequired(), teamH.ResetPassword)
 			team.GET("/timecards", teamH.ListTimeCards)
