@@ -443,16 +443,17 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 p-5 md:p-6">
-      <section className={clsx('grid gap-4', showAttendanceCard ? 'lg:grid-cols-[2fr_1fr]' : 'lg:grid-cols-1')}>
+      {/* Daily Overview - Full Width */}
+      <section>
         <div className="overflow-hidden rounded-[22px] bg-gradient-to-br from-primary via-primary to-[#236fa0] text-white shadow-[0_24px_70px_rgba(20,64,94,0.28)]">
-          <div className="flex h-full flex-col justify-between gap-6 p-5 md:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
+          <div className="flex h-full flex-col justify-between gap-6 p-6 md:p-7">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">{t('dashboard.dailyOverview', 'Daily overview')}</p>
-                <h2 className="mt-2 text-[28px] font-semibold leading-tight">
+                <h2 className="mt-2 text-[32px] font-bold leading-tight">
                   {greeting()}, {user?.name?.split(' ')[0] || t('dashboard.teamFallback', 'Team')}.
                 </h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-white/78">
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
                   {t('dashboard.overviewDescription', 'We have condensed today\'s work so you can review tasks, projects, billing, and team status without jumping between pages.')}
                 </p>
               </div>
@@ -461,7 +462,7 @@ export default function DashboardPage() {
                 <button
                   onClick={handleClock}
                   disabled={clockLoading}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/12 px-4 py-2 text-xs font-medium text-white transition hover:bg-white/18 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/12 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/20 disabled:opacity-60"
                 >
                   <Clock size={14} />
                   {clockLoading
@@ -502,58 +503,92 @@ export default function DashboardPage() {
             ) : null}
           </div>
         </div>
+      </section>
 
-        {showAttendanceCard ? (
-          <div className="card border-primary/10 bg-white">
-            <div className="card-header border-b-primary/10 py-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('dashboard.attendance', 'Attendance')}</p>
-                <h3 className="mt-0.5 text-xs font-semibold text-gray-900">{t('dashboard.todayStatus', 'Today status')}</h3>
-              </div>
-              <div className={clsx(
-                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                user?.clocked_in ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-              )}>
-                {user?.clocked_in ? 'Clocked In' : 'Clocked Out'}
+      {/* Attendance Section - Below Daily Overview */}
+          <div className="card border-primary/10 bg-white shadow-md">
+            <div className="card-header border-b-primary/10 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('dashboard.attendance', 'Attendance')}</p>
+                  <h3 className="mt-1 text-base font-semibold text-gray-900">{t('dashboard.todayStatus', 'Today status')}</h3>
+                </div>
+                <div className={clsx(
+                  'rounded-full px-3 py-1.5 text-xs font-semibold',
+                  user?.clocked_in ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                )}>
+                  {user?.clocked_in ? 'Clocked In' : 'Clocked Out'}
+                </div>
               </div>
             </div>
-            <div className="card-body space-y-2 py-3">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Your session</p>
-                    <div className="mt-0.5 text-sm font-semibold text-gray-900">
-                      {user?.clocked_in ? 'Active now' : 'Not started'}
+            <div className="card-body">
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Your Session */}
+                <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 p-5 border border-blue-200">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Your session</p>
+                      <div className="mt-2 text-2xl font-bold text-blue-900">
+                        {user?.clocked_in ? 'Active now' : 'Not started'}
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-blue-700">
+                        {user?.clocked_in
+                          ? 'You are currently clocked in. Remember to clock out when done.'
+                          : 'Start your workday to sync timesheet and attendance.'}
+                      </p>
+                    </div>
+                    <div className="ml-3 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                      <Clock size={20} />
                     </div>
                   </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-primary shadow-sm">
-                    <Clock size={16} />
+                </div>
+
+                {/* Team Overview */}
+                <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 p-5 border border-amber-200">
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Team overview</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-2xl font-bold text-amber-900">{stats.clocked_in_count ?? 0}</div>
+                      <div className="mt-1 text-xs text-amber-700">Clocked in</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-amber-900">{clockedOut}</div>
+                      <div className="mt-1 text-xs text-amber-700">Clocked out</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-amber-700">Total team: {stats.total_members ?? 0}</p>
+                </div>
+
+                {/* Quick Action */}
+                <div className="rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 p-5 border border-purple-200">
+                  <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">Quick action</p>
+                  <div className="mt-4 flex flex-col gap-3">
+                    <button
+                      onClick={handleClock}
+                      disabled={clockLoading}
+                      className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-[#1e5a7d] px-4 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:opacity-60"
+                    >
+                      <Clock size={16} />
+                      {clockLoading
+                        ? t('dashboard.updating', 'Updating...')
+                        : user?.clocked_in
+                          ? t('dashboard.clockOut', 'Clock Out')
+                          : t('dashboard.clockIn', 'Clock In')}
+                    </button>
+                    <Link
+                      to={timecardsRoute}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-purple-300 bg-white px-4 py-2 text-xs font-medium text-purple-700 transition hover:bg-purple-50"
+                    >
+                      <Users size={14} />
+                      View time cards
+                      <ArrowRight size={12} />
+                    </Link>
                   </div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-gray-200 bg-white p-2">
-                  <p className="text-xs text-gray-500">Clocked in</p>
-                  <div className="mt-0.5 text-base font-semibold text-primary">{stats.clocked_in_count ?? 0}</div>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-2">
-                  <p className="text-xs text-gray-500">Clocked out</p>
-                  <div className="mt-0.5 text-base font-semibold text-gray-800">{clockedOut}</div>
-                </div>
-              </div>
-
-              <Link
-                to={timecardsRoute}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80"
-              >
-                Open time cards
-                <ArrowRight size={12} />
-              </Link>
             </div>
           </div>
         ) : null}
-      </section>
 
       {visibleStatCards.length > 0 ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
