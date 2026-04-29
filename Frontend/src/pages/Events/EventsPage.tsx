@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -12,10 +13,16 @@ import { PageHeader, Modal, FormField, ConfirmDialog, Loading } from '@/componen
 const localizer = momentLocalizer(moment)
 
 export default function EventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [events, setEvents] = useState<any[]>([])
   const [calEvents, setCalEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<string>(Views.MONTH)
+  const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768
+  const [view, setView] = useState<string>(() => (
+    typeof window !== 'undefined' && window.innerWidth < 768
+      ? Views.AGENDA
+      : Views.MONTH
+  ))
   const [date, setDate] = useState(new Date())
   const [showModal, setShowModal] = useState(false)
   const [showManageLabels, setShowManageLabels] = useState(false)
@@ -59,6 +66,25 @@ export default function EventsPage() {
     setShowModal(true)
   }
 
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setForm({
+      title: '',
+      description: '',
+      start_date: '',
+      end_date: '',
+      all_day: false,
+      color: '#3b82f6',
+      type: '',
+    })
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
   const handleSave = async () => {
     if (!form.title.trim()) { toast.error('Title is required'); return }
     setSaving(true)
@@ -80,11 +106,7 @@ export default function EventsPage() {
     } catch { toast.error('Failed to delete') }
   }
 
-  const onSelectEvent = (event: any) => {
-    if (confirm(`Delete event "${event.title}"?`)) {
-      setDeleteId(event.id)
-    }
-  }
+  const onSelectEvent = (event: any) => setDeleteId(event.id)
 
   const eventStyleGetter = (event: any) => ({
     style: {
@@ -109,13 +131,13 @@ export default function EventsPage() {
       {loading
         ? <Loading />
         : (
-          <div className="bg-white rounded-lg border border-gray-200 p-4" style={{ height: 650 }}>
+          <div className="overflow-hidden rounded-[22px] border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
             <Calendar
               localizer={localizer}
               events={calEvents}
               startAccessor="start"
               endAccessor="end"
-              style={{ height: '100%' }}
+              style={{ height: isMobileViewport ? 560 : 650 }}
               view={view as any}
               onView={setView}
               date={date}

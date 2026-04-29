@@ -97,10 +97,16 @@ func (s *Server) setupRoutes() {
 		tasks := protected.Group("/tasks")
 		{
 			tasks.GET("", taskH.List)
+			tasks.GET("/columns", taskH.ListColumns)
+			tasks.POST("/columns", taskH.CreateColumn)
+			tasks.PATCH("/columns/reorder", taskH.ReorderColumns)
+			tasks.PUT("/columns/:id", taskH.UpdateColumn)
+			tasks.DELETE("/columns/:id", taskH.DeleteColumn)
 			tasks.POST("", taskH.Create)
 			tasks.GET("/:id", taskH.Get)
 			tasks.PUT("/:id", taskH.Update)
 			tasks.PATCH("/:id/status", taskH.UpdateStatus)
+			tasks.PATCH("/:id/kanban", taskH.MoveKanbanTask)
 			tasks.DELETE("/:id", taskH.Delete)
 		}
 
@@ -169,6 +175,7 @@ func (s *Server) setupRoutes() {
 			orders.POST("", orderH.Create)
 			orders.GET("/:id", orderH.Get)
 			orders.PUT("/:id", orderH.Update)
+			orders.DELETE("/:id", orderH.Delete)
 		}
 
 		// Events
@@ -210,6 +217,7 @@ func (s *Server) setupRoutes() {
 			team.GET("/members/:id", teamH.GetMember)
 			team.POST("/members", middleware.AdminRequired(), teamH.CreateMember)
 			team.PUT("/members/:id", middleware.AdminRequired(), teamH.UpdateMember)
+			team.PATCH("/members/:id/status", middleware.AdminRequired(), teamH.UpdateMemberStatus)
 			team.DELETE("/members/:id", middleware.AdminRequired(), teamH.DeleteMember)
 			team.POST("/members/:id/reset-password", middleware.AdminRequired(), teamH.ResetPassword)
 			team.GET("/timecards", teamH.ListTimeCards)

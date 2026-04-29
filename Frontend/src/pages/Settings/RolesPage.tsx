@@ -1,26 +1,9 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { roleService } from '@/services/api'
+import { dashboardItem, findPermissionEntry, navGroups, permissionItems } from '@/config/navigation'
 import { toast } from 'react-toastify'
 import { Plus, Trash2, ShieldCheck } from 'lucide-react'
 import { PageHeader, Modal, ConfirmDialog, Loading, EmptyState } from '@/components/common'
-
-const MENUS = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'events', label: 'Events' },
-  { key: 'clients', label: 'Clients' },
-  { key: 'projects', label: 'Projects' },
-  { key: 'tasks', label: 'Tasks' },
-  { key: 'leads', label: 'Leads' },
-  { key: 'sales', label: 'Sales' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'messages', label: 'Messages' },
-  { key: 'team', label: 'Team' },
-  { key: 'files', label: 'Files' },
-  { key: 'expenses', label: 'Expenses' },
-  { key: 'reports', label: 'Reports' },
-  { key: 'todo', label: 'To Do' },
-  { key: 'settings', label: 'Settings' },
-]
 
 interface Role {
   id: number
@@ -33,11 +16,44 @@ type PermMap = Record<string, { can_read: boolean; can_edit: boolean }>
 
 function buildPermMap(permissions: Role['permissions']): PermMap {
   const map: PermMap = {}
-  MENUS.forEach(m => { map[m.key] = { can_read: false, can_edit: false } })
-  permissions?.forEach(p => {
-    map[p.menu] = { can_read: p.can_read, can_edit: p.can_edit }
+  permissionItems.forEach(item => {
+    const permission = findPermissionEntry(permissions, item.menu)
+    map[item.menu] = sanitizePermission({
+      can_read: permission?.can_read ?? false,
+      can_edit: permission?.can_edit ?? false,
+    })
   })
   return map
+}
+
+function sanitizePermission(permission: { can_read: boolean; can_edit: boolean }) {
+  if (permission.can_edit) {
+    return { can_read: true, can_edit: true }
+  }
+
+  if (!permission.can_read) {
+    return { can_read: false, can_edit: false }
+  }
+
+  return permission
+}
+
+function applyPermissionChange(
+  current: { can_read: boolean; can_edit: boolean },
+  field: 'can_read' | 'can_edit',
+  value: boolean
+) {
+  if (field === 'can_read') {
+    return {
+      can_read: value,
+      can_edit: value ? current.can_edit : false,
+    }
+  }
+
+  return {
+    can_read: value ? true : current.can_read,
+    can_edit: value,
+  }
 }
 
 export default function RolesPage() {
@@ -122,11 +138,20 @@ export default function RolesPage() {
   const handleSavePermissions = async () => {
     if (!permRole) return
     setSaving(true)
-    const permissions = MENUS.map(m => ({
-      menu: m.key,
-      can_read: permMap[m.key]?.can_read ?? false,
-      can_edit: permMap[m.key]?.can_edit ?? false,
-    }))
+    const permissions = permissionItems.flatMap(item => {
+      const permission = sanitizePermission({
+        can_read: permMap[item.menu]?.can_read ?? false,
+        can_edit: permMap[item.menu]?.can_edit ?? false,
+      })
+
+      if (!permission.can_read && !permission.can_edit) return []
+
+      return [{
+        menu: item.menu,
+        can_read: permission.can_read,
+        can_edit: permission.can_edit,
+      }]
+    })
     try {
       await roleService.setPermissions(permRole.id, permissions)
       toast.success('Permissions saved!')
@@ -138,21 +163,29 @@ export default function RolesPage() {
 
   const togglePerm = (menu: string, field: 'can_read' | 'can_edit') => {
     setPermMap(prev => {
-      const current = { ...prev[menu] }
-      current[field] = !current[field]
-      if (field === 'can_edit' && current.can_edit) current.can_read = true
-      if (field === 'can_read' && !current.can_read) current.can_edit = false
-      return { ...prev, [menu]: current }
+      const current = prev[menu] ?? { can_read: false, can_edit: false }
+      const next = applyPermissionChange(current, field, !current[field])
+      return { ...prev, [menu]: next }
     })
   }
 
   const toggleAll = (field: 'can_read' | 'can_edit', value: boolean) => {
     setPermMap(prev => {
       const next = { ...prev }
-      MENUS.forEach(m => {
-        next[m.key] = { ...next[m.key], [field]: value }
-        if (field === 'can_edit' && value) next[m.key].can_read = true
-        if (field === 'can_read' && !value) next[m.key].can_edit = false
+      permissionItems.forEach(item => {
+        const current = next[item.menu] ?? { can_read: false, can_edit: false }
+        next[item.menu] = applyPermissionChange(current, field, value)
+      })
+      return next
+    })
+  }
+
+  const toggleGroup = (menus: string[], field: 'can_read' | 'can_edit', value: boolean) => {
+    setPermMap(prev => {
+      const next = { ...prev }
+      menus.forEach(menu => {
+        const current = next[menu] ?? { can_read: false, can_edit: false }
+        next[menu] = applyPermissionChange(current, field, value)
       })
       return next
     })
@@ -254,7 +287,7 @@ export default function RolesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-2 pr-4 text-gray-600 font-medium">Menu</th>
+                <th className="text-left py-2 pr-4 text-gray-600 font-medium">Menu &amp; submenu</th>
                 <th className="text-center py-2 px-3 text-gray-600 font-medium w-20">
                   <div>Read</div>
                   <div className="flex justify-center gap-1 mt-1">
@@ -274,30 +307,87 @@ export default function RolesPage() {
               </tr>
             </thead>
             <tbody>
-              {MENUS.map(m => (
-                <tr key={m.key} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-2 pr-4 text-gray-700">{m.label}</td>
-                  <td className="py-2 px-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={permMap[m.key]?.can_read ?? false}
-                      onChange={() => togglePerm(m.key, 'can_read')}
-                      className="w-4 h-4 rounded accent-blue-600"
-                    />
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={permMap[m.key]?.can_edit ?? false}
-                      onChange={() => togglePerm(m.key, 'can_edit')}
-                      className="w-4 h-4 rounded accent-blue-600"
-                    />
-                  </td>
-                </tr>
-              ))}
+              <tr className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="py-2 pr-4 text-gray-700 font-medium">{dashboardItem.label}</td>
+                <td className="py-2 px-3 text-center">
+                  <PermissionCheckbox
+                    checked={permMap[dashboardItem.menu]?.can_read ?? false}
+                    onChange={() => togglePerm(dashboardItem.menu, 'can_read')}
+                    ariaLabel={`Toggle read access for ${dashboardItem.label}`}
+                  />
+                </td>
+                <td className="py-2 px-3 text-center">
+                  <PermissionCheckbox
+                    checked={permMap[dashboardItem.menu]?.can_edit ?? false}
+                    onChange={() => togglePerm(dashboardItem.menu, 'can_edit')}
+                    ariaLabel={`Toggle edit access for ${dashboardItem.label}`}
+                  />
+                </td>
+              </tr>
+
+              {navGroups.map(group => {
+                const childMenus = group.items.map(item => item.menu)
+                const readCheckedCount = childMenus.filter(menu => permMap[menu]?.can_read).length
+                const editCheckedCount = childMenus.filter(menu => permMap[menu]?.can_edit).length
+                const allReadChecked = readCheckedCount === childMenus.length
+                const allEditChecked = editCheckedCount === childMenus.length
+
+                return (
+                  <Fragment key={group.id}>
+                    <tr className="border-b border-gray-200 bg-slate-50">
+                      <td className="py-2 pr-4 font-semibold text-gray-800">{group.label}</td>
+                      <td className="py-2 px-3 text-center">
+                        <PermissionCheckbox
+                          checked={allReadChecked}
+                          indeterminate={readCheckedCount > 0 && !allReadChecked}
+                          onChange={() => toggleGroup(childMenus, 'can_read', !allReadChecked)}
+                          ariaLabel={`Toggle read access for ${group.label}`}
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <PermissionCheckbox
+                          checked={allEditChecked}
+                          indeterminate={editCheckedCount > 0 && !allEditChecked}
+                          onChange={() => toggleGroup(childMenus, 'can_edit', !allEditChecked)}
+                          ariaLabel={`Toggle edit access for ${group.label}`}
+                        />
+                      </td>
+                    </tr>
+                    {group.items.map(item => (
+                      <tr key={item.menu} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 pr-4 pl-7 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <span className="h-px w-3 bg-gray-300" />
+                            <span>{item.label}</span>
+                            {item.comingSoon && (
+                              <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                Soon
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <PermissionCheckbox
+                            checked={permMap[item.menu]?.can_read ?? false}
+                            onChange={() => togglePerm(item.menu, 'can_read')}
+                            ariaLabel={`Toggle read access for ${item.label}`}
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <PermissionCheckbox
+                            checked={permMap[item.menu]?.can_edit ?? false}
+                            onChange={() => togglePerm(item.menu, 'can_edit')}
+                            ariaLabel={`Toggle edit access for ${item.label}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
-          <p className="text-xs text-gray-400 mt-3">Enabling Edit automatically enables Read. Disabling Read automatically disables Edit.</p>
+          <p className="text-xs text-gray-400 mt-3">Selecting a menu group applies the same permission to its submenus. Enabling Edit automatically enables Read. Disabling Read automatically disables Edit.</p>
         </div>
       </Modal>
 
@@ -309,6 +399,35 @@ export default function RolesPage() {
         message="Delete this role? Users assigned to it will lose their app role."
       />
     </div>
+  )
+}
+
+function PermissionCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: () => void
+  ariaLabel: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      aria-label={ariaLabel}
+      className="w-4 h-4 rounded accent-blue-600"
+    />
   )
 }
 

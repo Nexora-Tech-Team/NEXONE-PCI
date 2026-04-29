@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { authService } from '@/services/api'
+import { findPermissionEntry } from '@/config/navigation'
 
 export interface Permission {
   menu: string
@@ -157,13 +158,13 @@ export default authSlice.reducer
 export function canRead(permissions: Permission[] | null | undefined, role: string | undefined, menu: string): boolean {
   if (!role || role === 'admin') return true
   if (!permissions) return true // null or undefined = full access
-  const p = permissions.find(x => x.menu === menu)
+  const p = findPermissionEntry(permissions, menu)
   return p?.can_read ?? false
 }
 
 export function canEdit(permissions: Permission[] | null | undefined, role: string | undefined, menu: string): boolean {
   if (!role || role === 'admin') return true
   if (!permissions) return true
-  const p = permissions.find(x => x.menu === menu)
+  const p = findPermissionEntry(permissions, menu)
   return p?.can_edit ?? false
 }

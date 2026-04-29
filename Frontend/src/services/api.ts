@@ -49,7 +49,7 @@ export const authService = {
 
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardService = {
-  getStats: () => api.get('/dashboard'),
+  getStats: (params?: any) => api.get('/dashboard', { params }),
 }
 
 // ─── Clients ─────────────────────────────────────────
@@ -82,11 +82,18 @@ export const projectService = {
 // ─── Tasks ───────────────────────────────────────────
 export const taskService = {
   list: (params?: any) => api.get('/tasks', { params }),
+  listKanbanColumns: () => api.get('/tasks/columns'),
+  createKanbanColumn: (data: any) => api.post('/tasks/columns', data),
+  reorderKanbanColumns: (data: { column_ids: number[] }) => api.patch('/tasks/columns/reorder', data),
+  updateKanbanColumn: (id: number, data: any) => api.put(`/tasks/columns/${id}`, data),
+  deleteKanbanColumn: (id: number) => api.delete(`/tasks/columns/${id}`),
   get: (id: number) => api.get(`/tasks/${id}`),
   create: (data: any) => api.post('/tasks', data),
   update: (id: number, data: any) => api.put(`/tasks/${id}`, data),
   updateStatus: (id: number, status: string) =>
     api.patch(`/tasks/${id}/status`, { status }),
+  moveKanbanTask: (id: number, data: { destination_column_id: number; destination_index: number }) =>
+    api.patch(`/tasks/${id}/kanban`, data),
   delete: (id: number) => api.delete(`/tasks/${id}`),
 }
 
@@ -124,7 +131,7 @@ export const paymentService = {
 
 // ─── Contracts ───────────────────────────────────────
 export const contractService = {
-  list: () => api.get('/contracts'),
+  list: (params?: any) => api.get('/contracts', { params }),
   create: (data: any) => api.post('/contracts', data),
   update: (id: number, data: any) => api.put(`/contracts/${id}`, data),
   delete: (id: number) => api.delete(`/contracts/${id}`),
@@ -152,6 +159,7 @@ export const teamService = {
   getMember: (id: number) => api.get(`/team/members/${id}`),
   createMember: (data: any) => api.post('/team/members', data),
   updateMember: (id: number, data: any) => api.put(`/team/members/${id}`, data),
+  setMemberStatus: (id: number, is_active: boolean) => api.patch(`/team/members/${id}/status`, { is_active }),
   resetPassword: (id: number, data?: { password?: string }) =>
     api.post(`/team/members/${id}/reset-password`, data ?? {}),
   listTimeCards: () => api.get('/team/timecards'),
@@ -166,7 +174,7 @@ export const teamService = {
 
 // ─── Orders ──────────────────────────────────────────
 export const orderService = {
-  list: () => api.get('/orders'),
+  list: (params?: any) => api.get('/orders', { params }),
   get: (id: number) => api.get(`/orders/${id}`),
   create: (data: any) => api.post('/orders', data),
   update: (id: number, data: any) => api.put(`/orders/${id}`, data),

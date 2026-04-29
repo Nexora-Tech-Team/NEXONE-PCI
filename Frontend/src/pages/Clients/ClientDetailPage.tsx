@@ -134,12 +134,12 @@ export default function ClientDetailPage() {
         setPayments(r.data.data || [])
       }
       if (key === 'orders' && orders.length === 0) {
-        const r = await orderService.list()
-        setOrders((r.data.data || []).filter((o: any) => o.client_id === clientId))
+        const r = await orderService.list({ client_id: clientId })
+        setOrders(r.data.data || [])
       }
       if (key === 'contracts' && contracts.length === 0) {
-        const r = await contractService.list()
-        setContracts((r.data.data || []).filter((c: any) => c.client_id === clientId))
+        const r = await contractService.list({ client_id: clientId })
+        setContracts(r.data.data || [])
       }
       if (key === 'files' && files.length === 0) {
         const r = await fileService.list({ client_id: clientId })
