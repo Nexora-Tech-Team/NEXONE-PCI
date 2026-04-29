@@ -21,6 +21,7 @@ import { dashboardService, taskService, projectService, teamService } from '@/se
 import { Loading, StatusBadge, ProgressBar } from '@/components/common'
 import { dashboardItem, findNavigationItemByMenu, navGroups } from '@/config/navigation'
 import { formatIDR } from '@/utils/format'
+import { useLocale } from '@/contexts/LocaleContext'
 
 const TASK_COLORS = ['#f97316', '#3b82f6', '#10b981', '#ef4444']
 
@@ -82,7 +83,9 @@ type StatCard = SummaryTile & {
 
 type QuickAccessItem = {
   menu: string
+  titleKey: string
   title: string
+  descriptionKey: string
   description: string
   icon: typeof CheckSquare
   section: SectionKey
@@ -91,42 +94,54 @@ type QuickAccessItem = {
 const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
   {
     menu: 'tasks',
+    titleKey: 'dashboard.taskBoard',
     title: 'Task board',
+    descriptionKey: 'dashboard.reviewAssignments',
     description: 'Review assignments and deadlines',
     icon: CheckSquare,
     section: 'operations',
   },
   {
     menu: 'projects',
+    titleKey: 'dashboard.projectTracking',
     title: 'Project tracking',
+    descriptionKey: 'dashboard.monitorProgress',
     description: 'Monitor progress and completion',
     icon: TrendingUp,
     section: 'operations',
   },
   {
     menu: 'sales.invoices',
+    titleKey: 'dashboard.invoiceCenter',
     title: 'Invoice center',
+    descriptionKey: 'dashboard.invoiceCenterDescription',
     description: 'Follow up billing and due amounts',
     icon: CreditCard,
     section: 'finance',
   },
   {
     menu: 'expenses',
+    titleKey: 'dashboard.expenseLog',
     title: 'Expense log',
+    descriptionKey: 'dashboard.expenseLogDescription',
     description: 'Review submitted operational costs',
     icon: Wallet,
     section: 'finance',
   },
   {
     menu: 'team.timecards',
+    titleKey: 'dashboard.timeCards',
     title: 'Time cards',
+    descriptionKey: 'dashboard.openAttendanceRecords',
     description: 'Open detailed attendance records',
     icon: Users,
     section: 'team',
   },
   {
     menu: 'team.leave',
+    titleKey: 'dashboard.leaveRequests',
     title: 'Leave requests',
+    descriptionKey: 'dashboard.leaveRequestsDescription',
     description: 'Track who is away today',
     icon: Calendar,
     section: 'team',
@@ -175,6 +190,7 @@ function ClickableSummaryCard({
 export default function DashboardPage() {
   const { user, permissions } = useSelector((s: RootState) => s.auth)
   const dispatch = useDispatch<AppDispatch>()
+  const { t, locale } = useLocale()
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
   const [tasks, setTasks] = useState<DashboardTask[]>([])
   const [projects, setProjects] = useState<DashboardProject[]>([])
@@ -258,15 +274,15 @@ export default function DashboardPage() {
     try {
       if (user?.clocked_in) {
         await teamService.clockOut()
-        toast.success('Clocked out successfully!')
+        toast.success(t('dashboard.clockOutSuccess', 'Clocked out successfully!'))
       } else {
         await teamService.clockIn()
-        toast.success('Clocked in successfully!')
+        toast.success(t('dashboard.clockInSuccess', 'Clocked in successfully!'))
       }
       await dispatch(fetchMe()).unwrap()
       await loadData()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Clock action failed')
+      toast.error(err.response?.data?.error || t('dashboard.clockActionFailed', 'Clock action failed'))
     } finally {
       setClockLoading(false)
     }
@@ -274,16 +290,16 @@ export default function DashboardPage() {
 
   const greeting = () => {
     const hour = new Date().getHours()
-    if (hour < 12) return 'Selamat pagi'
-    if (hour < 17) return 'Selamat siang'
-    return 'Selamat sore'
+    if (hour < 12) return t('dashboard.greetingMorning', 'Good morning')
+    if (hour < 17) return t('dashboard.greetingAfternoon', 'Good afternoon')
+    return t('dashboard.greetingEvening', 'Good evening')
   }
 
   const taskChartData = [
-    { name: 'To do', value: stats.tasks_todo ?? 0 },
-    { name: 'In progress', value: stats.tasks_in_progress ?? 0 },
-    { name: 'Done', value: stats.tasks_done ?? 0 },
-    { name: 'Expired', value: stats.tasks_expired ?? 0 },
+    { name: t('dashboard.toDo', 'To do'), value: stats.tasks_todo ?? 0 },
+    { name: t('dashboard.inProgress', 'In progress'), value: stats.tasks_in_progress ?? 0 },
+    { name: t('dashboard.done', 'Done'), value: stats.tasks_done ?? 0 },
+    { name: t('dashboard.expired', 'Expired'), value: stats.tasks_expired ?? 0 },
   ]
 
   const visibleIncome = canViewPayments ? (stats.total_income ?? 0) : 0
@@ -296,11 +312,11 @@ export default function DashboardPage() {
   const incomePercent = totalIE > 0 ? Math.round((visibleIncome / totalIE) * 100) : 0
 
   const invoiceRows = [
-    { label: 'Overdue', color: '#c0392b', val: stats.overdue_amount ?? 0 },
-    { label: 'Not paid', color: '#d97706', val: stats.not_paid_amount ?? 0 },
-    { label: 'Partially paid', color: '#2980b9', val: stats.partially_paid_amount ?? 0 },
-    { label: 'Fully paid', color: '#1e8449', val: stats.fully_paid_amount ?? 0 },
-    { label: 'Draft', color: '#94a3b8', val: stats.draft_amount ?? 0 },
+    { label: t('dashboard.overdue', 'Overdue'), color: '#c0392b', val: stats.overdue_amount ?? 0 },
+    { label: t('dashboard.notPaid', 'Not paid'), color: '#d97706', val: stats.not_paid_amount ?? 0 },
+    { label: t('dashboard.partiallyPaid', 'Partially paid'), color: '#2980b9', val: stats.partially_paid_amount ?? 0 },
+    { label: t('dashboard.fullyPaid', 'Fully paid'), color: '#1e8449', val: stats.fully_paid_amount ?? 0 },
+    { label: t('dashboard.draft', 'Draft'), color: '#94a3b8', val: stats.draft_amount ?? 0 },
   ]
 
   const projectTotal =
@@ -314,30 +330,30 @@ export default function DashboardPage() {
 
   const summaryTiles: SummaryTile[] = [
     {
-      label: 'Task health',
+      label: t('dashboard.taskHealth', 'Task health'),
       value: stats.open_tasks ?? 0,
-      hint: 'Open task assigned to you',
+      hint: t('dashboard.openTaskAssignedToYou', 'Open task assigned to you'),
       menu: 'tasks',
       section: 'operations',
     },
     {
-      label: 'Project pace',
+      label: t('dashboard.projectPace', 'Project pace'),
       value: `${projectCompletion}%`,
-      hint: 'Completion across tracked projects',
+      hint: t('dashboard.completionAcrossTrackedProjects', 'Completion across tracked projects'),
       menu: 'projects',
       section: 'operations',
     },
     {
-      label: 'Team on site',
+      label: t('dashboard.teamOnSite', 'Team on site'),
       value: stats.clocked_in_count ?? 0,
-      hint: 'Currently clocked in today',
+      hint: t('dashboard.currentlyClockedInToday', 'Currently clocked in today'),
       menu: 'team.timecards',
       section: 'team',
     },
     {
-      label: 'Billing due',
+      label: t('dashboard.billingDue', 'Billing due'),
       value: formatIDR(stats.due_amount ?? 0),
-      hint: 'Outstanding amount in current period',
+      hint: t('dashboard.outstandingAmount', 'Outstanding amount in current period'),
       menu: 'sales.invoices',
       section: 'finance',
     },
@@ -345,36 +361,36 @@ export default function DashboardPage() {
 
   const statCards: StatCard[] = [
     {
-      label: 'My open tasks',
+      label: t('dashboard.stat.myOpenTasks', 'My open tasks'),
       value: stats.open_tasks ?? 0,
-      hint: `${stats.tasks_in_progress ?? 0} in progress`,
+      hint: t('dashboard.stat.inProgressHint', '{count} in progress', { count: stats.tasks_in_progress ?? 0 }),
       menu: 'tasks',
       section: 'operations',
       icon: CheckSquare,
       iconClass: 'bg-blue-50 text-blue-700',
     },
     {
-      label: 'Open projects',
+      label: t('dashboard.stat.openProjects', 'Open projects'),
       value: stats.open_projects ?? 0,
-      hint: `${stats.completed_projects ?? 0} completed`,
+      hint: t('dashboard.stat.completedHint', '{count} completed', { count: stats.completed_projects ?? 0 }),
       menu: 'projects',
       section: 'operations',
       icon: FolderKanban,
       iconClass: 'bg-sky-50 text-sky-700',
     },
     {
-      label: 'On leave today',
+      label: t('dashboard.stat.onLeaveToday', 'On leave today'),
       value: stats.on_leave_today ?? 0,
-      hint: `${stats.total_members ?? 0} total members`,
+      hint: t('dashboard.stat.totalMembersHint', '{count} total members', { count: stats.total_members ?? 0 }),
       menu: 'team.leave',
       section: 'team',
       icon: Calendar,
       iconClass: 'bg-amber-50 text-amber-700',
     },
     {
-      label: 'Due amount',
+      label: t('dashboard.stat.dueAmount', 'Due amount'),
       value: formatIDR(stats.due_amount ?? 0),
-      hint: `${formatIDR(stats.total_invoiced ?? 0)} invoiced`,
+      hint: t('dashboard.stat.invoicedHint', '{amount} invoiced', { amount: formatIDR(stats.total_invoiced ?? 0) }),
       menu: 'sales.invoices',
       section: 'finance',
       icon: CreditCard,
@@ -432,13 +448,12 @@ export default function DashboardPage() {
           <div className="flex h-full flex-col justify-between gap-6 p-6 md:p-7">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="max-w-2xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Daily overview</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">{t('dashboard.dailyOverview', 'Daily overview')}</p>
                 <h2 className="mt-2 text-[28px] font-semibold leading-tight">
-                  {greeting()}, {user?.name?.split(' ')[0] || 'Tim'}.
+                  {greeting()}, {user?.name?.split(' ')[0] || t('dashboard.teamFallback', 'Team')}.
                 </h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-white/78">
-                  Dashboard ini hanya menampilkan modul yang dapat Anda baca, dengan ringkasan
-                  operasional, finance, dan team yang bisa langsung dibuka dari setiap widget.
+                  {t('dashboard.overviewDescription', 'We have condensed today\'s work so you can review tasks, projects, billing, and team status without jumping between pages.')}
                 </p>
               </div>
 
@@ -450,16 +465,21 @@ export default function DashboardPage() {
                 >
                   <Clock size={14} />
                   {clockLoading
-                    ? 'Updating...'
+                    ? t('dashboard.updating', 'Updating...')
                     : user?.clocked_in
-                      ? 'Clock Out'
-                      : 'Clock In'}
+                      ? t('dashboard.clockOut', 'Clock Out')
+                      : t('dashboard.clockIn', 'Clock In')}
                 </button>
               ) : null}
             </div>
 
             {visibleSummaryTiles.length > 0 ? (
-              <div className={clsx('grid gap-3', visibleSummaryTiles.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+              <div className={clsx(
+                'grid gap-3',
+                visibleSummaryTiles.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' :
+                visibleSummaryTiles.length === 3 ? 'sm:grid-cols-3' :
+                'sm:grid-cols-2'
+              )}>
                 {visibleSummaryTiles.map(tile => {
                   const navItem = findNavigationItemByMenu(tile.menu)
                   const tileContent = (
@@ -487,8 +507,8 @@ export default function DashboardPage() {
           <div className="card border-primary/10 bg-white">
             <div className="card-header border-b-primary/10">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">Attendance</p>
-                <h3 className="mt-1 text-sm font-semibold text-gray-900">Today status</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('dashboard.attendance', 'Attendance')}</p>
+                <h3 className="mt-1 text-sm font-semibold text-gray-900">{t('dashboard.todayStatus', 'Today status')}</h3>
               </div>
               <div className={clsx(
                 'rounded-full px-2.5 py-1 text-[11px] font-semibold',
