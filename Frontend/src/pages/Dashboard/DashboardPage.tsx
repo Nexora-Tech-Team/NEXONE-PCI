@@ -506,6 +506,8 @@ export default function DashboardPage() {
       </section>
 
       {/* Attendance Section - Below Daily Overview */}
+      {showAttendanceCard ? (
+        <section>
           <div className="card border-primary/10 bg-white shadow-md">
             <div className="card-header border-b-primary/10 pb-4">
               <div className="flex items-center justify-between">
@@ -588,7 +590,8 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        ) : null}
+        </section>
+      ) : null}
 
       {visibleStatCards.length > 0 ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
