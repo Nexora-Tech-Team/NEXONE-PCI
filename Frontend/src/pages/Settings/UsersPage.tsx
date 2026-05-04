@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { teamService, roleService } from '@/services/api'
 import { toast } from 'react-toastify'
-import { Plus, KeyRound, UserX, UserCheck } from 'lucide-react'
+import { Plus, KeyRound, UserX, UserCheck, Trash2 } from 'lucide-react'
 import {
   PageHeader, SearchInput, Pagination,
   Modal, ConfirmDialog, Loading, EmptyState, Avatar
@@ -67,6 +67,7 @@ export default function UsersPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
   const [deactivateId, setDeactivateId] = useState<number | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const [editUser, setEditUser] = useState<UserRow | null>(null)
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM)
@@ -171,6 +172,18 @@ export default function UsersPage() {
       load()
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Failed to update user status')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    try {
+      await teamService.deleteMember(deleteId)
+      toast.success('User deleted successfully')
+      setDeleteId(null)
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to delete user')
     }
   }
 
@@ -279,6 +292,15 @@ export default function UsersPage() {
                               onClick={() => setDeactivateId(u.id)}
                             >
                               {u.is_active ? <UserX size={11} /> : <UserCheck size={11} />}
+                            </button>
+                          )}
+                          {u.id !== currentUser?.id && (
+                            <button
+                              className="btn btn-danger text-xs py-0.5 px-2"
+                              title="Delete user"
+                              onClick={() => setDeleteId(u.id)}
+                            >
+                              <Trash2 size={11} />
                             </button>
                           )}
                         </div>
@@ -412,6 +434,14 @@ export default function UsersPage() {
               : 'Activate this user? They will be able to login again.'
             : ''
         }
+      />
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Delete User"
+        message="Are you sure you want to permanently delete this user? This action cannot be undone."
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
       />
     </div>
   )

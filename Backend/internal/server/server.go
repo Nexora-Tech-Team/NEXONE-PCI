@@ -145,6 +145,7 @@ func (s *Server) setupRoutes() {
 		paymentH := handlers.NewPaymentHandler(s.db)
 		protected.GET("/payments", paymentH.List)
 		protected.GET("/payments/:id", paymentH.Get)
+		protected.DELETE("/payments/:id", middleware.AdminRequired(), paymentH.Delete)
 
 		// Contracts
 		contractH := handlers.NewContractHandler(s.db)

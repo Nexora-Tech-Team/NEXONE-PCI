@@ -1753,6 +1753,24 @@ func (h *PaymentHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, payment)
 }
 
+func (h *PaymentHandler) Delete(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var payment models.Payment
+	if err := h.db.First(&payment, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		return
+	}
+	if err := h.db.Delete(&payment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete payment"})
+		return
+	}
+	recordAudit(h.db, c, "DELETE", "payment", id, fmt.Sprintf("payment #%d", id))
+	c.JSON(http.StatusOK, gin.H{"message": "Payment deleted"})
+}
+
 // ─── CONTRACT ────────────────────────────────────────
 
 type ContractHandler struct{ db *gorm.DB }
@@ -2357,8 +2375,12 @@ func (h *TeamHandler) DeleteMember(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
-	h.db.Model(&member).Update("is_active", false)
-	c.JSON(http.StatusOK, gin.H{"message": "User deactivated"})
+	if err := h.db.Delete(&member).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		return
+	}
+	recordAudit(h.db, c, "DELETE", "user", id, member.Name)
+	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
 }
 
 func (h *TeamHandler) ResetPassword(c *gin.Context) {

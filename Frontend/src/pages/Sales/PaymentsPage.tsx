@@ -1,14 +1,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { paymentService } from '@/services/api'
 import { toast } from 'react-toastify'
-import { FileDown, Printer } from 'lucide-react'
-import { PageHeader, Toolbar, SearchInput, Loading, EmptyState } from '@/components/common'
+import { FileDown, Printer, Trash2 } from 'lucide-react'
+import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog } from '@/components/common'
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const load = useCallback((q = '') => {
     setLoading(true)
@@ -24,6 +25,20 @@ export default function PaymentsPage() {
     const timer = setTimeout(() => load(search), 300)
     return () => clearTimeout(timer)
   }, [search])
+
+  const handleDelete = () => {
+    if (!deleteId) return
+    paymentService.delete(deleteId)
+      .then(() => {
+        toast.success('Payment deleted')
+        setDeleteId(null)
+        load(search)
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || 'Failed to delete payment')
+        setDeleteId(null)
+      })
+  }
 
   const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString()}`
   const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
@@ -58,11 +73,11 @@ export default function PaymentsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th></tr>
+              <tr><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {payments.length === 0
-                ? <tr><td colSpan={6}><EmptyState /></td></tr>
+                ? <tr><td colSpan={7}><EmptyState /></td></tr>
                 : payments.map(p => (
                   <tr key={p.id}>
                     <td className="font-medium text-blue-600">{p.invoice?.invoice_number || '-'}</td>
@@ -71,6 +86,15 @@ export default function PaymentsPage() {
                     <td className="text-gray-500 capitalize">{p.payment_method || '-'}</td>
                     <td className="text-gray-400 whitespace-nowrap">{p.payment_date ? new Date(p.payment_date).toLocaleDateString('id') : '-'}</td>
                     <td className="text-gray-400">{p.note || '-'}</td>
+                    <td>
+                      <button
+                        className="btn btn-danger text-xs py-0.5 px-2"
+                        title="Delete payment"
+                        onClick={() => setDeleteId(p.id)}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               }
@@ -78,6 +102,14 @@ export default function PaymentsPage() {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Delete Payment"
+        message="Are you sure you want to delete this payment? This action cannot be undone."
+        onConfirm={handleDelete}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   )
 }

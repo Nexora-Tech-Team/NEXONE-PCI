@@ -127,6 +127,7 @@ export const invoiceService = {
 // ─── Payments ────────────────────────────────────────
 export const paymentService = {
   list: (params?: any) => api.get('/payments', { params }),
+  delete: (id: number) => api.delete(`/payments/${id}`),
 }
 
 // ─── Contracts ───────────────────────────────────────
@@ -162,6 +163,7 @@ export const teamService = {
   setMemberStatus: (id: number, is_active: boolean) => api.patch(`/team/members/${id}/status`, { is_active }),
   resetPassword: (id: number, data?: { password?: string }) =>
     api.post(`/team/members/${id}/reset-password`, data ?? {}),
+  deleteMember: (id: number) => api.delete(`/team/members/${id}`),
   listTimeCards: () => api.get('/team/timecards'),
   clockIn: () => api.post('/team/timecards/clock-in'),
   clockOut: () => api.post('/team/timecards/clock-out'),
