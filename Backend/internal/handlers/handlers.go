@@ -67,6 +67,33 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+// ─── SEQUENCE / PROGRESS HELPERS ─────────────────────
+
+func recalcProjectProgress(db *gorm.DB, projectID uint) {
+	var total, done int64
+	db.Model(&models.Task{}).Where("project_id = ?", projectID).Count(&total)
+	db.Model(&models.Task{}).Where("project_id = ? AND status = ?", projectID, "done").Count(&done)
+	progress := 0
+	if total > 0 {
+		progress = int(float64(done) / float64(total) * 100)
+	}
+	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
+}
+
+func syncSequence(db *gorm.DB, tableName string) {
+	db.Exec(fmt.Sprintf(`
+		DO $$ BEGIN
+		  PERFORM setval(
+			pg_get_serial_sequence('%s', 'id'),
+			COALESCE((SELECT MAX(id) FROM %s), 0) + 1,
+			false
+		  );
+		END $$;
+	`, tableName, tableName))
+}
+
+var resetSequenceIfEmpty = syncSequence
+
 // ─── DASHBOARD ───────────────────────────────────────
 
 type DashboardHandler struct{ db *gorm.DB }
@@ -316,6 +343,7 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	resetSequenceIfEmpty(h.db, "projects")
 	h.db.Create(&project)
 	recordAudit(h.db, c, "create", "project", project.ID, project.Title)
 	c.JSON(http.StatusCreated, project)
@@ -365,6 +393,17 @@ func (h *ProjectHandler) GetTimeline(c *gin.Context) {
 	var tasks []models.Task
 	h.db.Where("project_id = ?", id).Order("updated_at desc").Limit(20).Find(&tasks)
 	c.JSON(http.StatusOK, gin.H{"data": tasks})
+}
+
+func (h *ProjectHandler) PatchStatus(c *gin.Context) {
+	id, _ := getID(c)
+	var req struct {
+		Status string `json:"status"`
+	}
+	c.ShouldBindJSON(&req)
+	h.db.Model(&models.Project{}).Where("id = ?", id).Update("status", req.Status)
+	recordAudit(h.db, c, "update", "project", id, "status→"+req.Status)
+	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
 }
 
 // ─── TASK ────────────────────────────────────────────
