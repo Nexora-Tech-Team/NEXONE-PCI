@@ -43,6 +43,53 @@ const mobileStyles = `
   .anim-rotateCCW { animation: rotateSlowCCW 24s linear infinite; }
   .anim-fadeInUp  { animation: fadeInUp 0.6s ease-out both; }
   .anim-logoPulse { animation: logoPulse 4s ease-in-out infinite; }
+
+  /* ── Desktop animations ── */
+  @keyframes fadeInLeft {
+    from { opacity: 0; transform: translateX(-28px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes fadeInRight {
+    from { opacity: 0; transform: translateX(28px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideUpFade {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bgDrift {
+    0%, 100% { transform: scale(1.12) translate(0px, 0px); }
+    33%       { transform: scale(1.14) translate(-5px, -4px); }
+    66%       { transform: scale(1.11) translate(4px, 3px); }
+  }
+  @keyframes logoDesktopGlow {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(59,130,246,0.3)); }
+    50%       { filter: drop-shadow(0 0 26px rgba(99,102,241,0.5)); }
+  }
+  @keyframes cardEntrance {
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .anim-fadeInLeft  { animation: fadeInLeft  0.75s cubic-bezier(0.22,1,0.36,1) both; }
+  .anim-fadeInRight { animation: fadeInRight 0.85s cubic-bezier(0.22,1,0.36,1) 0.1s both; }
+  .anim-slideUp-1   { animation: slideUpFade 0.55s ease-out 0.25s both; }
+  .anim-slideUp-2   { animation: slideUpFade 0.55s ease-out 0.38s both; }
+  .anim-slideUp-3   { animation: slideUpFade 0.55s ease-out 0.51s both; }
+  .anim-slideUp-4   { animation: slideUpFade 0.55s ease-out 0.64s both; }
+  .anim-slideUp-5   { animation: slideUpFade 0.55s ease-out 0.77s both; }
+  .anim-bgDrift     { animation: bgDrift 22s ease-in-out infinite; }
+  .anim-logoDesktop { animation: logoDesktopGlow 4.5s ease-in-out infinite; }
+  .anim-cardEntrance { animation: cardEntrance 0.9s cubic-bezier(0.22,1,0.36,1) 0.15s both; }
+
+  /* Desktop input subtle lift on focus */
+  .input-desktop { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease; }
+  .input-desktop:focus { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(30,58,95,0.09); }
+
+  /* Desktop sign-in button hover lift */
+  .btn-signin-desk { transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease; }
+  .btn-signin-desk:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(13,31,60,0.38); }
+  .btn-signin-desk:active:not(:disabled) { transform: translateY(0); }
 `
 
 export default function LoginPage() {
@@ -219,13 +266,13 @@ export default function LoginPage() {
           DESKTOP LAYOUT (unchanged)
       ══════════════════════════════════════════════ */}
       <div className="hidden lg:flex min-h-screen w-full flex-row">
-        <div className="relative flex min-h-screen w-[30%] flex-col bg-white">
+        <div className="anim-fadeInLeft relative flex min-h-screen w-[30%] flex-col bg-white">
           <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
-            <img src={nexoraPartUrl} alt="Nexora" className="h-[288px] w-auto object-contain"/>
+            <img src={nexoraPartUrl} alt="Nexora" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
           </div>
           <div className="flex flex-1 flex-col justify-center px-16 py-12">
             <div className="w-full max-w-[420px]">
-              <div className="mb-7">
+              <div className="anim-slideUp-1 mb-7">
                 <h2 className="text-[1.9rem] font-bold text-gray-900 leading-tight mb-1.5">Welcome back</h2>
                 <p className="text-[14px] text-gray-400">Sign in to access your workspace</p>
               </div>
@@ -233,46 +280,48 @@ export default function LoginPage() {
                 <div className="mb-5 px-4 py-3 rounded-xl text-sm text-red-600 bg-red-50 border border-red-200">{error}</div>
               )}
               <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
-                <div>
+                <div className="anim-slideUp-2">
                   <label className="block text-[12px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Email address</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none"><Mail size={15} className="text-gray-400"/></span>
                     <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email" required autoComplete="off"
-                      className="w-full pl-10 pr-4 py-3 text-[14px] rounded-lg border border-gray-200 bg-gray-50 placeholder-gray-300 text-gray-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white transition-all"/>
+                      className="input-desktop w-full pl-10 pr-4 py-3 text-[14px] rounded-lg border border-gray-200 bg-gray-50 placeholder-gray-300 text-gray-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white"/>
                   </div>
                 </div>
-                <div>
+                <div className="anim-slideUp-3">
                   <label className="block text-[12px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Password</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none"><Lock size={15} className="text-gray-400"/></span>
                     <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required autoComplete="off"
-                      className="w-full pl-10 pr-11 py-3 text-[14px] rounded-lg border border-gray-200 bg-gray-50 placeholder-gray-300 text-gray-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white transition-all"/>
+                      className="input-desktop w-full pl-10 pr-11 py-3 text-[14px] rounded-lg border border-gray-200 bg-gray-50 placeholder-gray-300 text-gray-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white"/>
                     <button type="button" onClick={() => setShowPass(!showPass)} className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
                       {showPass ? <EyeOff size={15}/> : <Eye size={15}/>}
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between py-1">
+                <div className="anim-slideUp-4 flex items-center justify-between py-1">
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
                     <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-[#1e3a5f] cursor-pointer"/>
                     <span className="text-[13px] text-gray-600">Remember me</span>
                   </label>
                   <button type="button" onClick={() => navigate('/forgot-password')} className="text-[13px] font-semibold text-[#1a5cb0] hover:text-[#1e3a5f] transition-colors">Forgot password?</button>
                 </div>
-                <button type="submit" disabled={loading}
-                        className="w-full py-3.5 rounded-lg text-[15px] font-semibold text-white bg-[#0d1f3c] hover:bg-[#172d50] active:bg-[#0a1628] flex items-center justify-center gap-2 transition-colors disabled:opacity-70 shadow-md shadow-[#0d1f3c]/25">
-                  {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : 'Sign in'}
-                </button>
+                <div className="anim-slideUp-5">
+                  <button type="submit" disabled={loading}
+                          className="btn-signin-desk w-full py-3.5 rounded-lg text-[15px] font-semibold text-white bg-[#0d1f3c] hover:bg-[#172d50] active:bg-[#0a1628] flex items-center justify-center gap-2 disabled:opacity-70 shadow-md shadow-[#0d1f3c]/25">
+                    {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : 'Sign in'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
           <div className="px-16 pb-8"><p className="text-[11px] text-gray-300">© 2026 NEXORA. All rights reserved.</p></div>
         </div>
-        <div className="flex flex-1 relative overflow-hidden items-center justify-center">
-          <img src={frameKananUrl} alt="" className="absolute inset-0 w-full h-full object-cover object-left-top scale-110"
+        <div className="anim-fadeInRight flex flex-1 relative overflow-hidden items-center justify-center">
+          <img src={frameKananUrl} alt="" className="anim-bgDrift absolute inset-0 w-full h-full object-cover object-left-top"
                style={{ filter: 'blur(18px)', opacity: 0.85 }}/>
           <div className="absolute inset-0" style={{ background: 'rgba(8,18,40,0.45)' }}/>
-          <div className="relative z-10 w-[99%] h-[99%] rounded-2xl overflow-hidden" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
+          <div className="anim-cardEntrance relative z-10 w-[99%] h-[99%] rounded-2xl overflow-hidden" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
             <img src={frameKananUrl} alt="" className="w-full h-full object-cover object-left-top"/>
           </div>
         </div>
