@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/api'
-import pusintekLogoUrl from '../../../logo/Logo_Pusintek.jpeg'
+import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import { ArrowLeft, ShieldAlert, CheckCircle } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full lg:w-[40%] xl:w-[38%] flex flex-col justify-center">
         <div className="w-full px-10 xl:px-16 py-12">
           <div className="mb-10">
-            <img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-24 w-auto object-contain" />
+            <img src={nexoraLogoUrl} alt="Nexora" className="h-24 w-auto object-contain" />
           </div>
 
           <div className="flex justify-center mb-5">

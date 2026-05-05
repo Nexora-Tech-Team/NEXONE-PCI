@@ -7,7 +7,7 @@ import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
-import pusintekLogoUrl from "../../../logo/Logo_Pusintek.jpeg"
+import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
   TrendingUp, Menu, Search,
@@ -634,7 +634,7 @@ export default function Layout() {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center"><div className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5"><img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-8 w-auto object-contain" /></div></button>
+          <button onClick={() => navigate('/dashboard')} className="flex items-center"><div className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5"><img src={nexoraLogoUrl} alt="Nexora" className="h-8 w-auto object-contain" /></div></button>
           <button
             onClick={() => dispatch(setSidebar(false))}
             className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
@@ -1022,7 +1022,7 @@ export default function Layout() {
                 aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-9 w-auto object-contain" />
+                  <img src={nexoraLogoUrl} alt="Nexora" className="h-9 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>

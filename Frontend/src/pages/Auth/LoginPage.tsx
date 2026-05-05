@@ -6,7 +6,7 @@ import { RootState, AppDispatch } from '@/store'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 import frameKananUrl from '../../../logo/FrameKanan.png'
-import pusintekLogoUrl from "../../../logo/Logo_Pusintek.jpeg"
+import nexoraPartUrl from '../../../logo/Logo_Nexora_Part.png'
 
 export default function LoginPage() {
   const dispatch  = useDispatch<AppDispatch>()
@@ -40,7 +40,7 @@ export default function LoginPage() {
           <div className="absolute top-6 -left-8 w-32 h-32 rounded-full bg-white/5" />
           <div className="absolute bottom-6 right-10 w-20 h-20 rounded-full bg-teal-400/20" />
           <div className="absolute bottom-0 left-0 w-full h-12 bg-white rounded-t-[2rem]" />
-          <img src={pusintekLogoUrl} alt="PUSTEKINFO"
+          <img src={nexoraPartUrl} alt="Nexora"
             className="relative z-10 h-28 w-auto object-contain rounded-2xl"
             style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.35))' }} />
           <p className="relative z-10 mt-4 text-white/75 text-sm text-center font-medium tracking-wide">
@@ -53,7 +53,7 @@ export default function LoginPage() {
 
         {/* ── Desktop logo (hidden on mobile) ──────── */}
         <div className="hidden lg:flex z-20 items-center justify-center px-10 pt-8">
-          <img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-32 w-auto object-contain" />
+          <img src={nexoraPartUrl} alt="Nexora" className="h-32 w-auto object-contain" />
         </div>
 
         {/* Form — rounded top on mobile, normal on desktop */}
