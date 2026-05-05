@@ -82,19 +82,22 @@ func recalcProjectProgress(db *gorm.DB, projectID uint) {
 	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
 }
 
-// resetSequenceIfEmpty resets the PostgreSQL id sequence to 1 when the table is truly empty
-// (including soft-deleted rows). Errors from setval are silently ignored.
-func resetSequenceIfEmpty(db *gorm.DB, tableName string) {
-	var count int64
-	// Unscoped: count ALL rows, including soft-deleted, to avoid false positives
-	db.Table(tableName).Unscoped().Count(&count)
-	if count == 0 {
-		// DO block swallows "argument is NULL" and other errors gracefully
-		db.Exec(fmt.Sprintf(`DO $$ BEGIN
-			PERFORM setval(pg_get_serial_sequence('%s', 'id'), 1, false);
-		EXCEPTION WHEN OTHERS THEN NULL; END $$`, tableName))
-	}
+// syncSequence aligns the PostgreSQL id sequence with the actual MAX(id) in the table.
+// Guarantees the next insert gets MAX(id)+1, or 1 for an empty table.
+// Includes ALL rows (raw SQL ignores GORM soft-delete filter).
+// Errors (e.g. missing sequence) are silently swallowed by the DO block.
+func syncSequence(db *gorm.DB, tableName string) {
+	db.Exec(fmt.Sprintf(`DO $$ BEGIN
+		PERFORM setval(
+			pg_get_serial_sequence('%s', 'id'),
+			COALESCE((SELECT MAX(id) FROM %s), 0) + 1,
+			false
+		);
+	EXCEPTION WHEN OTHERS THEN NULL; END $$`, tableName, tableName))
 }
+
+// resetSequenceIfEmpty is kept as an alias for backward compatibility.
+func resetSequenceIfEmpty(db *gorm.DB, tableName string) { syncSequence(db, tableName) }
 
 // ─── DASHBOARD ───────────────────────────────────────
 
