@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { leadService, clientService } from '@/services/api'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
@@ -49,6 +49,15 @@ export default function LeadsPage() {
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
   const [clientContacts, setClientContacts] = useState<any[]>([])
   const [contactIsCustom, setContactIsCustom] = useState(false)
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0 })
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const updateDropPos = () => {
+    if (nameInputRef.current) {
+      const r = nameInputRef.current.getBoundingClientRect()
+      setDropPos({ top: r.bottom + 4, left: r.left, width: r.width })
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -293,58 +302,71 @@ export default function LeadsPage() {
       >
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <FormField label="Name" required>
-              <div className="relative">
-                <input
-                  className="input"
-                  value={clientSearch}
-                  onChange={e => {
-                    setClientSearch(e.target.value)
-                    setForm({ ...form, name: e.target.value })
-                    setShowClientDrop(true)
-                  }}
-                  onFocus={() => setShowClientDrop(true)}
-                  onBlur={() => setTimeout(() => setShowClientDrop(false), 150)}
-                  placeholder="Company / lead name"
-                />
-                {showClientDrop && clientSearch.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
-                    {clients
-                      .filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()))
-                      .slice(0, 8)
-                      .map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
-                          onMouseDown={() => {
-                            setClientSearch(c.name)
-                            setForm((f: any) => ({
-                              ...f,
-                              name: c.name,
-                              email: f.email || c.email || '',
-                              phone: f.phone || c.phone || '',
-                            }))
-                            setSelectedClientId(c.id)
-                            setShowClientDrop(false)
-                            clientService.getContacts(c.id)
-                              .then(r => {
-                                setClientContacts(r.data.data || [])
-                                setContactIsCustom(false)
-                              })
-                              .catch(() => setClientContacts([]))
-                          }}
-                        >
-                          <span className="font-medium">{c.name}</span>
-                          {c.email && <span className="text-xs text-gray-400">{c.email}</span>}
-                        </button>
-                      ))
-                    }
-                  </div>
-                )}
-              </div>
+            <FormField label="Name" required hint={clients.length > 0 ? 'Ketik untuk mencari client yang ada, atau isi nama baru' : undefined}>
+              <input
+                ref={nameInputRef}
+                className="input"
+                value={clientSearch}
+                onChange={e => {
+                  setClientSearch(e.target.value)
+                  setForm({ ...form, name: e.target.value })
+                  setSelectedClientId(null)
+                  setClientContacts([])
+                  setShowClientDrop(true)
+                  updateDropPos()
+                }}
+                onFocus={() => { setShowClientDrop(true); updateDropPos() }}
+                onBlur={() => setTimeout(() => setShowClientDrop(false), 200)}
+                placeholder="Company / lead name"
+                autoComplete="off"
+              />
             </FormField>
           </div>
+
+          {/* Client dropdown — rendered via fixed positioning to escape modal overflow:hidden */}
+          {showClientDrop && (() => {
+            const filtered = clients
+              .filter(c => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase()))
+              .slice(0, 8)
+            if (filtered.length === 0) return null
+            return (
+              <div
+                style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
+                className="bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto"
+              >
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">Existing Clients</div>
+                {filtered.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-gray-100 last:border-0"
+                    onMouseDown={() => {
+                      setClientSearch(c.name)
+                      setForm((f: any) => ({
+                        ...f,
+                        name: c.name,
+                        email: f.email || c.email || '',
+                        phone: f.phone || c.phone || '',
+                      }))
+                      setSelectedClientId(c.id)
+                      setShowClientDrop(false)
+                      clientService.getContacts(c.id)
+                        .then(r => { setClientContacts(r.data.data || []); setContactIsCustom(false) })
+                        .catch(() => setClientContacts([]))
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-[10px] font-bold flex-shrink-0">
+                        {c.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium text-gray-800 truncate">{c.name}</span>
+                    </div>
+                    {c.email && <span className="text-xs text-gray-400 flex-shrink-0">{c.email}</span>}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
           <FormField label="Primary Contact">
             {clientContacts.length > 0 && !contactIsCustom ? (
               <select
