@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
 
-  const fetch = () => {
+  const fetch = (overridePage?: number) => {
     setLoading(true)
     projectService.list({ page, limit: 10, q: search })
       .then(r => { setProjects(r.data.data || []); setTotal(r.data.total || 0) })
@@ -90,7 +90,8 @@ export default function ProjectsPage() {
         toast.success('Project created!')
       }
       setShowModal(false)
-      fetch()
+      setPage(1)
+      fetch(1)
     } catch { toast.error(editItem ? 'Failed to update project' : 'Failed to create project') }
     finally { setSaving(false) }
   }

@@ -59,9 +59,9 @@ export default function LeadsPage() {
     }
   }
 
-  const load = () => {
+  const load = (overridePage?: number) => {
     setLoading(true)
-    const params: any = { page, limit: 10, q: search }
+    const params: any = { page: overridePage ?? page, limit: 10, q: search }
     if (statusFilter) params.status = statusFilter
     leadService.list(params)
       .then(r => { setLeads(r.data.data || []); setTotal(r.data.total || 0) })
@@ -130,7 +130,9 @@ export default function LeadsPage() {
         toast.success('Lead created!')
       }
       setShowModal(false)
-      load(); loadAll()
+      setPage(1)
+      load(1)
+      loadAll()
     } catch { toast.error('Failed to save lead') }
     finally { setSaving(false) }
   }

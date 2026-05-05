@@ -82,13 +82,17 @@ func recalcProjectProgress(db *gorm.DB, projectID uint) {
 	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
 }
 
-// resetSequenceIfEmpty resets the PostgreSQL id sequence to 1 when the table is empty,
-// so the first record after a full delete gets ID 1.
+// resetSequenceIfEmpty resets the PostgreSQL id sequence to 1 when the table is truly empty
+// (including soft-deleted rows). Errors from setval are silently ignored.
 func resetSequenceIfEmpty(db *gorm.DB, tableName string) {
 	var count int64
-	db.Table(tableName).Where("deleted_at IS NULL").Count(&count)
+	// Unscoped: count ALL rows, including soft-deleted, to avoid false positives
+	db.Table(tableName).Unscoped().Count(&count)
 	if count == 0 {
-		db.Exec(fmt.Sprintf("SELECT setval(pg_get_serial_sequence('%s', 'id'), 1, false)", tableName))
+		// DO block swallows "argument is NULL" and other errors gracefully
+		db.Exec(fmt.Sprintf(`DO $$ BEGIN
+			PERFORM setval(pg_get_serial_sequence('%s', 'id'), 1, false);
+		EXCEPTION WHEN OTHERS THEN NULL; END $$`, tableName))
 	}
 }
 
@@ -277,7 +281,10 @@ func (h *ClientHandler) AddContact(c *gin.Context) {
 		return
 	}
 	contact.ClientID = id
-	h.db.Create(&contact)
+	if err := h.db.Create(&contact).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, contact)
 }
 
@@ -343,7 +350,10 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&project)
+	if err := h.db.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "project", project.ID, project.Title)
 	c.JSON(http.StatusCreated, project)
 }
@@ -1272,7 +1282,10 @@ func (h *LeadHandler) Create(c *gin.Context) {
 		return
 	}
 	lead.OwnerID = getUserID(c)
-	h.db.Create(&lead)
+	if err := h.db.Create(&lead).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusCreated, lead)
 }
@@ -1436,7 +1449,10 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
 	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
-	h.db.Create(&invoice)
+	if err := h.db.Create(&invoice).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusCreated, invoice)
 }
@@ -1678,7 +1694,10 @@ func (h *InvoiceHandler) AddPayment(c *gin.Context) {
 		return
 	}
 	payment.InvoiceID = id
-	h.db.Create(&payment)
+	if err := h.db.Create(&payment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, payment)
 }
@@ -1692,7 +1711,10 @@ func (h *InvoiceHandler) AddItem(c *gin.Context) {
 	}
 	item.InvoiceID = id
 	item.Total = item.Quantity * item.UnitPrice
-	h.db.Create(&item)
+	if err := h.db.Create(&item).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, item)
 }
@@ -1842,7 +1864,10 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&contract)
+	if err := h.db.Create(&contract).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "contract", contract.ID, contract.Title)
 	c.JSON(http.StatusCreated, contract)
 }
@@ -1941,7 +1966,10 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&order)
+	if err := h.db.Create(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, order)
 }
 
@@ -1999,7 +2027,10 @@ func (h *EventHandler) Create(c *gin.Context) {
 		return
 	}
 	event.CreatedByID = getUserID(c)
-	h.db.Create(&event)
+	if err := h.db.Create(&event).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, event)
 }
 
@@ -2046,7 +2077,10 @@ func (h *NoteHandler) Create(c *gin.Context) {
 		return
 	}
 	note.UserID = getUserID(c)
-	h.db.Create(&note)
+	if err := h.db.Create(&note).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, note)
 }
 
@@ -2090,7 +2124,10 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	}
 	expense.UserID = getUserID(c)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
-	h.db.Create(&expense)
+	if err := h.db.Create(&expense).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, expense)
 }
 
@@ -2495,7 +2532,10 @@ func (h *TeamHandler) ClockIn(c *gin.Context) {
 	}
 	now := time.Now()
 	card := models.TimeCard{UserID: userID, InTime: now, InDate: now}
-	h.db.Create(&card)
+	if err := h.db.Create(&card).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.db.Model(&models.User{}).Where("id = ?", userID).Update("clocked_in", true)
 	c.JSON(http.StatusCreated, card)
 }
@@ -2534,7 +2574,10 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 	}
 	leave.UserID = getUserID(c)
 	leave.Status = "pending"
-	h.db.Create(&leave)
+	if err := h.db.Create(&leave).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, leave)
 }
 
@@ -2562,7 +2605,10 @@ func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
 		return
 	}
 	ann.CreatedByID = getUserID(c)
-	h.db.Create(&ann)
+	if err := h.db.Create(&ann).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, ann)
 }
 
@@ -2639,7 +2685,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			f.FolderID = &id
 		}
 	}
-	h.db.Create(&f)
+	if err := h.db.Create(&f).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	// Update URL dengan ID yang sudah ada
 	h.db.Model(&f).Update("url", fmt.Sprintf("/api/v1/files/%d/download", f.ID))
 	c.JSON(http.StatusCreated, f)
@@ -2675,7 +2724,10 @@ func (h *FileHandler) CreateFolder(c *gin.Context) {
 	}
 	folder.IsFolder = true
 	folder.OwnerID = getUserID(c)
-	h.db.Create(&folder)
+	if err := h.db.Create(&folder).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, folder)
 }
 
@@ -2715,7 +2767,10 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		return
 	}
 	todo.UserID = getUserID(c)
-	h.db.Create(&todo)
+	if err := h.db.Create(&todo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, todo)
 }
 
@@ -2806,7 +2861,10 @@ func (h *LabelHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&label)
+	if err := h.db.Create(&label).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, label)
 }
 
