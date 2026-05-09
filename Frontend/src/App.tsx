@@ -27,6 +27,7 @@ import StorePage from '@/pages/Sales/StorePage'
 import PaymentsPage from '@/pages/Sales/PaymentsPage'
 import ItemsPage from '@/pages/Sales/ItemsPage'
 import ContractsPage from '@/pages/Sales/ContractsPage'
+import ContractDetailPage from '@/pages/Sales/ContractDetailPage'
 import QuotationsPage from '@/pages/Sales/QuotationsPage'
 import NotesPage from '@/pages/Notes/NotesPage'
 import MessagesPage from '@/pages/Messages/MessagesPage'
@@ -89,6 +90,7 @@ function AppShell() {
         <Route path="sales/payments" element={<PaymentsPage />} />
         <Route path="sales/items" element={<ItemsPage />} />
         <Route path="sales/contracts" element={<ContractsPage />} />
+        <Route path="sales/contracts/:id" element={<ContractDetailPage />} />
         <Route path="sales/quotations" element={<QuotationsPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="messages" element={<MessagesPage />} />

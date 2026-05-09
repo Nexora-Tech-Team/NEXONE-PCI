@@ -326,18 +326,24 @@ type Note struct {
 // ─── EXPENSE ─────────────────────────────────────────
 type Expense struct {
 	Base
-	Date        FlexTime `json:"date"`
-	Category    string   `json:"category"`
-	Title       string   `gorm:"not null" json:"title"`
-	Description string   `json:"description"`
-	Amount      float64  `json:"amount"`
-	Tax         float64  `json:"tax"`
-	SecondTax   float64  `json:"second_tax"`
-	Total       float64  `json:"total"`
-	FileURL     string   `json:"file_url"`
-	UserID      uint     `json:"user_id"`
-	User        *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	IsRecurring bool     `gorm:"default:false" json:"is_recurring"`
+	Date        FlexTime  `json:"date"`
+	Category    string    `json:"category"`
+	Title       string    `gorm:"not null" json:"title"`
+	Description string    `json:"description"`
+	Amount      float64   `json:"amount"`
+	Tax         float64   `json:"tax"`
+	SecondTax   float64   `json:"second_tax"`
+	Total       float64   `json:"total"`
+	FileURL     string    `json:"file_url"`
+	UserID      uint      `json:"user_id"`
+	User        *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	IsRecurring bool      `gorm:"default:false" json:"is_recurring"`
+	ContractID  *uint     `json:"contract_id"`
+	Contract    *Contract `gorm:"foreignKey:ContractID" json:"contract,omitempty"`
+	ClientID    *uint     `json:"client_id"`
+	Client      *Client   `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	ProjectID   *uint     `json:"project_id"`
+	Project     *Project  `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 }
 
 // ─── LEAVE ───────────────────────────────────────────

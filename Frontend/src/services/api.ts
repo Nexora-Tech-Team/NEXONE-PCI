@@ -134,6 +134,7 @@ export const paymentService = {
 // ─── Contracts ───────────────────────────────────────
 export const contractService = {
   list: (params?: any) => api.get('/contracts', { params }),
+  get: (id: number) => api.get(`/contracts/${id}`),
   create: (data: any) => api.post('/contracts', data),
   update: (id: number, data: any) => api.put(`/contracts/${id}`, data),
   delete: (id: number) => api.delete(`/contracts/${id}`),

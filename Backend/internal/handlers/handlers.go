@@ -70,29 +70,35 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 // ─── SEQUENCE / PROGRESS HELPERS ─────────────────────
 
 func recalcProjectProgress(db *gorm.DB, projectID uint) {
+	if projectID == 0 {
+		return
+	}
 	var total, done int64
-	db.Model(&models.Task{}).Where("project_id = ?", projectID).Count(&total)
-	db.Model(&models.Task{}).Where("project_id = ? AND status = ?", projectID, "done").Count(&done)
-	progress := 0
+	db.Model(&models.Task{}).Where("project_id = ? AND deleted_at IS NULL", projectID).Count(&total)
+	db.Model(&models.Task{}).Where("project_id = ? AND status = 'done' AND deleted_at IS NULL", projectID).Count(&done)
+	var progress int
 	if total > 0 {
-		progress = int(float64(done) / float64(total) * 100)
+		progress = int(done * 100 / total)
 	}
 	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
 }
 
+// syncSequence aligns the PostgreSQL id sequence with the actual MAX(id) in the table.
+// Guarantees the next insert gets MAX(id)+1, or 1 for an empty table.
+// Includes ALL rows (raw SQL ignores GORM soft-delete filter).
+// Errors (e.g. missing sequence) are silently swallowed by the DO block.
 func syncSequence(db *gorm.DB, tableName string) {
-	db.Exec(fmt.Sprintf(`
-		DO $$ BEGIN
-		  PERFORM setval(
+	db.Exec(fmt.Sprintf(`DO $$ BEGIN
+		PERFORM setval(
 			pg_get_serial_sequence('%s', 'id'),
 			COALESCE((SELECT MAX(id) FROM %s), 0) + 1,
 			false
-		  );
-		END $$;
-	`, tableName, tableName))
+		);
+	EXCEPTION WHEN OTHERS THEN NULL; END $$`, tableName, tableName))
 }
 
-var resetSequenceIfEmpty = syncSequence
+// resetSequenceIfEmpty is kept as an alias for backward compatibility.
+func resetSequenceIfEmpty(db *gorm.DB, tableName string) { syncSequence(db, tableName) }
 
 // ─── DASHBOARD ───────────────────────────────────────
 
@@ -212,6 +218,7 @@ func (h *ClientHandler) List(c *gin.Context) {
 }
 
 func (h *ClientHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "clients")
 	var client models.Client
 	if err := c.ShouldBindJSON(&client); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -278,7 +285,10 @@ func (h *ClientHandler) AddContact(c *gin.Context) {
 		return
 	}
 	contact.ClientID = id
-	h.db.Create(&contact)
+	if err := h.db.Create(&contact).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, contact)
 }
 
@@ -338,13 +348,16 @@ func (h *ProjectHandler) List(c *gin.Context) {
 }
 
 func (h *ProjectHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "projects")
 	var project models.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resetSequenceIfEmpty(h.db, "projects")
-	h.db.Create(&project)
+	if err := h.db.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "project", project.ID, project.Title)
 	c.JSON(http.StatusCreated, project)
 }
@@ -864,6 +877,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 }
 
 func (h *TaskHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "tasks")
 	var req taskPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -930,6 +944,9 @@ func (h *TaskHandler) Create(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "create", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusCreated, task)
 }
 
@@ -1036,6 +1053,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "update", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, task)
 }
 
@@ -1107,6 +1127,9 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "update_status", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "data": task})
 }
 
@@ -1195,6 +1218,9 @@ func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "move", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Task moved", "data": task})
 }
 
@@ -1234,6 +1260,9 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "delete", "task", id, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
@@ -1261,13 +1290,17 @@ func (h *LeadHandler) List(c *gin.Context) {
 }
 
 func (h *LeadHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leads")
 	var lead models.Lead
 	if err := c.ShouldBindJSON(&lead); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	lead.OwnerID = getUserID(c)
-	h.db.Create(&lead)
+	if err := h.db.Create(&lead).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusCreated, lead)
 }
@@ -1420,6 +1453,7 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "invoices")
 	var invoice models.Invoice
 	if err := c.ShouldBindJSON(&invoice); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1430,7 +1464,10 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
 	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
-	h.db.Create(&invoice)
+	if err := h.db.Create(&invoice).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusCreated, invoice)
 }
@@ -1664,6 +1701,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 </html>`
 
 func (h *InvoiceHandler) AddPayment(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "payments")
 	id, _ := getID(c)
 	var payment models.Payment
 	if err := c.ShouldBindJSON(&payment); err != nil {
@@ -1671,7 +1709,10 @@ func (h *InvoiceHandler) AddPayment(c *gin.Context) {
 		return
 	}
 	payment.InvoiceID = id
-	h.db.Create(&payment)
+	if err := h.db.Create(&payment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, payment)
 }
@@ -1685,7 +1726,10 @@ func (h *InvoiceHandler) AddItem(c *gin.Context) {
 	}
 	item.InvoiceID = id
 	item.Total = item.Quantity * item.UnitPrice
-	h.db.Create(&item)
+	if err := h.db.Create(&item).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, item)
 }
@@ -1829,12 +1873,16 @@ func (h *ContractHandler) List(c *gin.Context) {
 }
 
 func (h *ContractHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "contracts")
 	var contract models.Contract
 	if err := c.ShouldBindJSON(&contract); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&contract)
+	if err := h.db.Create(&contract).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "contract", contract.ID, contract.Title)
 	c.JSON(http.StatusCreated, contract)
 }
@@ -1883,6 +1931,7 @@ func (h *ItemHandler) List(c *gin.Context) {
 }
 
 func (h *ItemHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "items")
 	var item models.Item
 	if err := c.ShouldBindJSON(&item); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1926,12 +1975,16 @@ func (h *OrderHandler) List(c *gin.Context) {
 }
 
 func (h *OrderHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "orders")
 	var order models.Order
 	if err := c.ShouldBindJSON(&order); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&order)
+	if err := h.db.Create(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, order)
 }
 
@@ -1982,13 +2035,17 @@ func (h *EventHandler) List(c *gin.Context) {
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "events")
 	var event models.Event
 	if err := c.ShouldBindJSON(&event); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	event.CreatedByID = getUserID(c)
-	h.db.Create(&event)
+	if err := h.db.Create(&event).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, event)
 }
 
@@ -2028,13 +2085,17 @@ func (h *NoteHandler) List(c *gin.Context) {
 }
 
 func (h *NoteHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "notes")
 	var note models.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	note.UserID = getUserID(c)
-	h.db.Create(&note)
+	if err := h.db.Create(&note).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, note)
 }
 
@@ -2064,12 +2125,21 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 	var expenses []models.Expense
 	var total int64
 	recurring := c.Query("recurring") == "true"
-	h.db.Model(&models.Expense{}).Where("user_id = ? AND is_recurring = ?", userID, recurring).Count(&total)
-	h.db.Where("user_id = ? AND is_recurring = ?", userID, recurring).Order("date desc").Find(&expenses)
+	q := h.db.Model(&models.Expense{})
+	if clientID := c.Query("client_id"); clientID != "" {
+		q = q.Where("client_id = ?", clientID)
+	} else if projectID := c.Query("project_id"); projectID != "" {
+		q = q.Where("project_id = ?", projectID)
+	} else {
+		q = q.Where("user_id = ? AND is_recurring = ?", userID, recurring)
+	}
+	q.Count(&total)
+	q.Preload("Contract").Preload("Client").Preload("Project").Order("date desc").Find(&expenses)
 	c.JSON(http.StatusOK, gin.H{"data": expenses, "total": total})
 }
 
 func (h *ExpenseHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "expenses")
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2077,7 +2147,11 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	}
 	expense.UserID = getUserID(c)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
-	h.db.Create(&expense)
+	if err := h.db.Create(&expense).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusCreated, expense)
 }
 
@@ -2088,6 +2162,7 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 	c.ShouldBindJSON(&expense)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
 	h.db.Save(&expense)
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusOK, expense)
 }
 
@@ -2472,6 +2547,7 @@ func (h *TeamHandler) ListTimeCards(c *gin.Context) {
 }
 
 func (h *TeamHandler) ClockIn(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "time_cards")
 	userID := getUserID(c)
 	var existing models.TimeCard
 	// Check if already clocked in
@@ -2481,7 +2557,10 @@ func (h *TeamHandler) ClockIn(c *gin.Context) {
 	}
 	now := time.Now()
 	card := models.TimeCard{UserID: userID, InTime: now, InDate: now}
-	h.db.Create(&card)
+	if err := h.db.Create(&card).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.db.Model(&models.User{}).Where("id = ?", userID).Update("clocked_in", true)
 	c.JSON(http.StatusCreated, card)
 }
@@ -2512,6 +2591,7 @@ func (h *TeamHandler) ListLeaves(c *gin.Context) {
 }
 
 func (h *TeamHandler) ApplyLeave(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leaves")
 	var leave models.Leave
 	if err := c.ShouldBindJSON(&leave); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2519,7 +2599,10 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 	}
 	leave.UserID = getUserID(c)
 	leave.Status = "pending"
-	h.db.Create(&leave)
+	if err := h.db.Create(&leave).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, leave)
 }
 
@@ -2540,13 +2623,17 @@ func (h *TeamHandler) ListAnnouncements(c *gin.Context) {
 }
 
 func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "announcements")
 	var ann models.Announcement
 	if err := c.ShouldBindJSON(&ann); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	ann.CreatedByID = getUserID(c)
-	h.db.Create(&ann)
+	if err := h.db.Create(&ann).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, ann)
 }
 
@@ -2577,6 +2664,7 @@ func (h *FileHandler) List(c *gin.Context) {
 }
 
 func (h *FileHandler) Upload(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
@@ -2622,7 +2710,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			f.FolderID = &id
 		}
 	}
-	h.db.Create(&f)
+	if err := h.db.Create(&f).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	// Update URL dengan ID yang sudah ada
 	h.db.Model(&f).Update("url", fmt.Sprintf("/api/v1/files/%d/download", f.ID))
 	c.JSON(http.StatusCreated, f)
@@ -2650,6 +2741,7 @@ func (h *FileHandler) Download(c *gin.Context) {
 }
 
 func (h *FileHandler) CreateFolder(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	var folder models.File
 	if err := c.ShouldBindJSON(&folder); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2657,7 +2749,10 @@ func (h *FileHandler) CreateFolder(c *gin.Context) {
 	}
 	folder.IsFolder = true
 	folder.OwnerID = getUserID(c)
-	h.db.Create(&folder)
+	if err := h.db.Create(&folder).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, folder)
 }
 
@@ -2690,13 +2785,17 @@ func (h *TodoHandler) List(c *gin.Context) {
 }
 
 func (h *TodoHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "todos")
 	var todo models.Todo
 	if err := c.ShouldBindJSON(&todo); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	todo.UserID = getUserID(c)
-	h.db.Create(&todo)
+	if err := h.db.Create(&todo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, todo)
 }
 
@@ -2781,12 +2880,16 @@ func (h *LabelHandler) List(c *gin.Context) {
 }
 
 func (h *LabelHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "labels")
 	var label models.Label
 	if err := c.ShouldBindJSON(&label); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&label)
+	if err := h.db.Create(&label).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, label)
 }
 

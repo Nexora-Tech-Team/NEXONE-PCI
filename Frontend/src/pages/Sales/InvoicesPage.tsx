@@ -36,9 +36,9 @@ export default function InvoicesPage() {
     paid_amount: '0', due_amount: '', notes: '',
   })
 
-  const load = (q = search) => {
+  const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: 10 }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     invoiceService.list(params)
@@ -123,7 +123,8 @@ export default function InvoicesPage() {
         toast.success('Invoice created!')
       }
       setShowModal(false)
-      load()
+      setPage(1)
+      load(search, 1)
     } catch { toast.error(editItem ? 'Failed to update invoice' : 'Failed to create invoice') }
     finally { setSaving(false) }
   }

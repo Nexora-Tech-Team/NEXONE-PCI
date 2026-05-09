@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: nexone-production-deploy
@@ -12,7 +13,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.2.0
