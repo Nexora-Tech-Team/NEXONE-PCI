@@ -2124,8 +2124,16 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 	var expenses []models.Expense
 	var total int64
 	recurring := c.Query("recurring") == "true"
-	h.db.Model(&models.Expense{}).Where("user_id = ? AND is_recurring = ?", userID, recurring).Count(&total)
-	h.db.Where("user_id = ? AND is_recurring = ?", userID, recurring).Order("date desc").Find(&expenses)
+	q := h.db.Model(&models.Expense{})
+	if clientID := c.Query("client_id"); clientID != "" {
+		q = q.Where("client_id = ?", clientID)
+	} else if projectID := c.Query("project_id"); projectID != "" {
+		q = q.Where("project_id = ?", projectID)
+	} else {
+		q = q.Where("user_id = ? AND is_recurring = ?", userID, recurring)
+	}
+	q.Count(&total)
+	q.Preload("Contract").Preload("Client").Preload("Project").Order("date desc").Find(&expenses)
 	c.JSON(http.StatusOK, gin.H{"data": expenses, "total": total})
 }
 
@@ -2142,6 +2150,7 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusCreated, expense)
 }
 
@@ -2152,6 +2161,7 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 	c.ShouldBindJSON(&expense)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
 	h.db.Save(&expense)
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusOK, expense)
 }
 

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ps -p)",
+      "Bash(xargs kill -9)",
+      "Bash(curl -s http://localhost:8081/health)",
+      "Bash(PORT=8081 go run cmd/api/main.go)",
+      "Bash(curl -s http://localhost:3001 -o /dev/null -w \"%{http_code}\")",
+      "Bash(lsof -ti:8081)",
+      "Bash(psql -U cbqa -d cbqa_db -c \"\\\\d expenses\")",
+      "Bash(curl -s -X POST http://localhost:8081/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@cbqa.com\",\"password\":\"Admin123!\"}')",
+      "Bash(curl -s http://localhost:8081/api/v1/expenses -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6ImFkbWluQGNicWEuY29tIiwicm9sZSI6ImFkbWluIiwianRpIjoiMTMyMzcwMGIxMTA1NmQ0ZDNmZDk5YWY2ZDVkNTBkNzQiLCJleHAiOjE3Nzg0MTQ2NDgsImlhdCI6MTc3ODMyODI0OH0.YMXcY2vqiflDXE76ucZ5gmKVgnPDjx4FMbIbH8Y-jtc')",
+      "Bash(python3 -m json.tool)",
+      "Bash(psql -U cbqa -d cbqa_db -c \"SELECT id, title, user_id, contract_id, client_id FROM expenses ORDER BY id DESC LIMIT 5;\")",
+      "Bash(psql -U cbqa -d cbqa_db -c \"SELECT id, title, user_id, is_recurring, deleted_at FROM expenses WHERE user_id = 1;\")",
+      "Bash(psql -U cbqa -d cbqa_db -c \"SELECT id, title, client_id, project_id FROM contracts LIMIT 5;\")",
+      "Bash(psql -U cbqa -d cbqa_db -c \"SELECT id, title, project_id, client_id FROM expenses LIMIT 5;\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('count:', len\\(d.get\\('data',[]\\)\\)\\);  [print\\(e['id'], e['title'], 'project_id:', e.get\\('project_id'\\)\\) for e in d.get\\('data',[]\\)]\")"
+    ]
+  }
+}
