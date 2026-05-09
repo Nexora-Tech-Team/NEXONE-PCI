@@ -1,4 +1,4 @@
-name: Deploy PUSINTEK-NEXONE (sambernyawa)
+name: Deploy NEXONE
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-pusintek-nexone
+  group: nexone-production-deploy
   cancel-in-progress: true
 
 jobs:
@@ -15,29 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          command_timeout: 20m
           script: |
             set -e
-            cd ~/nexora-node/apps/pusintek-nexone
-
-            echo "==> Pull latest code"
-            git pull origin main
-
-            echo "==> Re-protect docker-compose.yml (VPS-specific routing)"
-            git update-index --skip-worktree docker-compose.yml
-
-            echo "==> Build & start containers"
-            docker compose up -d --build --no-deps frontend backend
-
-            echo "==> Wait for containers"
-            sleep 10
-
-            echo "==> Health check"
-            curl -sf https://sambernyawa.nexoratech.co > /dev/null && echo "OK sambernyawa.nexoratech.co" || (echo "FAILED" && exit 1)
-
-            echo "==> Deploy complete"
-
+            cd ~/nexora-node/apps/nexone
+            git branch -D deploy-tmp >/dev/null 2>&1 || true
+            git fetch origin main:deploy-tmp
+            git checkout main
+            git reset --hard deploy-tmp
+            git branch -D deploy-tmp
+            docker compose up -d --build frontend backend
+            docker ps --format '{{.Names}}' | grep '^nexone-backend$'
+            docker ps --format '{{.Names}}' | grep '^nexone-frontend$'

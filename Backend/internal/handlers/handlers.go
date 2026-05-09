@@ -67,7 +67,8 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-// recalcProjectProgress recalculates and stores project.progress based on done tasks ratio.
+// ─── SEQUENCE / PROGRESS HELPERS ─────────────────────
+
 func recalcProjectProgress(db *gorm.DB, projectID uint) {
 	if projectID == 0 {
 		return
