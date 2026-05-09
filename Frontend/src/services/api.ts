@@ -78,7 +78,6 @@ export const projectService = {
   patchStatus: (id: number, status: string) => api.patch(`/projects/${id}/status`, { status }),
   getTasks: (id: number) => api.get(`/projects/${id}/tasks`),
   getTimeline: (id: number) => api.get(`/projects/${id}/timeline`),
-  patchStatus: (id: number, status: string) => api.patch(`/projects/${id}/status`, { status }),
 }
 
 // ─── Tasks ───────────────────────────────────────────
