@@ -47,6 +47,24 @@ export const authService = {
     api.post('/auth/reset-password', { token, new_password: newPassword }),
 }
 
+// ─── Profile ─────────────────────────────────────────
+export const profileService = {
+  update: (data: any) => api.put('/profile', data),
+  uploadAvatar: (formData: FormData) =>
+    api.post('/profile/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+}
+
+// ─── Messages ────────────────────────────────────────
+export const messageService = {
+  listUsers: () => api.get('/messages/users'),
+  listConversations: () => api.get('/messages/conversations'),
+  createConversation: (participantId: number) => api.post('/messages/conversations', { participant_id: participantId }),
+  listMessages: (conversationId: number, params?: any) =>
+    api.get(`/messages/conversations/${conversationId}/messages`, { params }),
+  sendMessage: (conversationId: number, body: string) =>
+    api.post(`/messages/conversations/${conversationId}/messages`, { body }),
+}
+
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardService = {
   getStats: (params?: any) => api.get('/dashboard', { params }),

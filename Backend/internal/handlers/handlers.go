@@ -2637,6 +2637,296 @@ func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
 	c.JSON(http.StatusCreated, ann)
 }
 
+// ─── PROFILE ─────────────────────────────────────────
+
+type ProfileHandler struct {
+	db        *gorm.DB
+	uploadDir string
+}
+
+func NewProfileHandler(db *gorm.DB, uploadDir string) *ProfileHandler {
+	os.MkdirAll(filepath.Join(uploadDir, "avatars"), 0755)
+	return &ProfileHandler{db: db, uploadDir: uploadDir}
+}
+
+func (h *ProfileHandler) Update(c *gin.Context) {
+	userID := getUserID(c)
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var req struct {
+		Name     *string `json:"name"`
+		JobTitle *string `json:"job_title"`
+		Phone    *string `json:"phone"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+			return
+		}
+		updates["name"] = name
+	}
+	if req.JobTitle != nil {
+		updates["job_title"] = strings.TrimSpace(*req.JobTitle)
+	}
+	if req.Phone != nil {
+		updates["phone"] = strings.TrimSpace(*req.Phone)
+	}
+
+	if len(updates) > 0 {
+		if err := h.db.Model(&user).Updates(updates).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+			return
+		}
+		h.db.First(&user, userID)
+	}
+	c.JSON(http.StatusOK, gin.H{"user": userPayload(user), "permissions": resolvePermissions(h.db, user)})
+}
+
+func (h *ProfileHandler) UploadAvatar(c *gin.Context) {
+	userID := getUserID(c)
+	file, header, err := c.Request.FormFile("avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No avatar file provided"})
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar must be an image"})
+		return
+	}
+	if header.Size > 2*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar must be 2MB or smaller"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext == "" {
+		ext = ".jpg"
+	}
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".gif" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Supported avatar formats: JPG, PNG, WebP, GIF"})
+		return
+	}
+
+	dir := filepath.Join(h.uploadDir, "avatars")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create avatar directory"})
+		return
+	}
+	filename := fmt.Sprintf("%d_%d%s", userID, time.Now().UnixNano(), ext)
+	fullPath := filepath.Join(dir, filename)
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save avatar"})
+		return
+	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, file); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write avatar"})
+		return
+	}
+
+	avatarURL := "/api/v1/profile/avatar/" + filename
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	if err := h.db.Model(&user).Update("avatar", avatarURL).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile avatar"})
+		return
+	}
+	user.Avatar = avatarURL
+	c.JSON(http.StatusOK, gin.H{"user": userPayload(user), "permissions": resolvePermissions(h.db, user)})
+}
+
+func (h *ProfileHandler) Avatar(c *gin.Context) {
+	filename := filepath.Base(c.Param("filename"))
+	if filename == "." || filename == "/" || filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid avatar"})
+		return
+	}
+	c.File(filepath.Join(h.uploadDir, "avatars", filename))
+}
+
+// ─── MESSAGES ────────────────────────────────────────
+
+type MessageHandler struct{ db *gorm.DB }
+
+func NewMessageHandler(db *gorm.DB) *MessageHandler { return &MessageHandler{db: db} }
+
+func (h *MessageHandler) ListUsers(c *gin.Context) {
+	currentUserID := getUserID(c)
+	var users []models.User
+	h.db.Where("is_active = ? AND id <> ?", true, currentUserID).Order("name asc").Find(&users)
+	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+func (h *MessageHandler) ListConversations(c *gin.Context) {
+	userID := getUserID(c)
+	var conversations []models.Conversation
+	if err := h.db.
+		Joins("JOIN conversation_participants cp ON cp.conversation_id = conversations.id").
+		Where("cp.user_id = ?", userID).
+		Preload("Participants").
+		Order("conversations.updated_at desc").
+		Find(&conversations).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversations"})
+		return
+	}
+
+	items := make([]gin.H, 0, len(conversations))
+	for _, conv := range conversations {
+		var last models.Message
+		h.db.Preload("Sender").Where("conversation_id = ?", conv.ID).Order("created_at desc").First(&last)
+		items = append(items, gin.H{
+			"id":           conv.ID,
+			"title":        conv.Title,
+			"is_group":     conv.IsGroup,
+			"participants": conv.Participants,
+			"last_message": last,
+			"created_at":   conv.CreatedAt,
+			"updated_at":   conv.UpdatedAt,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *MessageHandler) CreateConversation(c *gin.Context) {
+	userID := getUserID(c)
+	var req struct {
+		ParticipantID uint `json:"participant_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.ParticipantID == userID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Choose another user to start a conversation"})
+		return
+	}
+
+	var participant models.User
+	if err := h.db.Where("id = ? AND is_active = ?", req.ParticipantID, true).First(&participant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var existing models.Conversation
+	err := h.db.Raw(`
+		SELECT c.*
+		FROM conversations c
+		JOIN conversation_participants cp1 ON cp1.conversation_id = c.id AND cp1.user_id = ?
+		JOIN conversation_participants cp2 ON cp2.conversation_id = c.id AND cp2.user_id = ?
+		WHERE c.is_group = false AND c.deleted_at IS NULL
+		GROUP BY c.id
+		HAVING COUNT(*) = 1
+		ORDER BY c.updated_at DESC
+		LIMIT 1
+	`, userID, req.ParticipantID).Scan(&existing).Error
+	if err == nil && existing.ID != 0 {
+		h.db.Preload("Participants").First(&existing, existing.ID)
+		c.JSON(http.StatusOK, existing)
+		return
+	}
+
+	var current models.User
+	h.db.First(&current, userID)
+	conversation := models.Conversation{IsGroup: false, Participants: []models.User{current, participant}}
+	if err := h.db.Create(&conversation).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create conversation"})
+		return
+	}
+	h.db.Preload("Participants").First(&conversation, conversation.ID)
+	c.JSON(http.StatusCreated, conversation)
+}
+
+func (h *MessageHandler) ListMessages(c *gin.Context) {
+	conversationID, ok := h.getConversationIDIfParticipant(c)
+	if !ok {
+		return
+	}
+	var q PaginationQuery
+	c.ShouldBindQuery(&q)
+	if q.Page <= 0 {
+		q.Page = 1
+	}
+	if q.Limit <= 0 || q.Limit > 100 {
+		q.Limit = 50
+	}
+
+	var messages []models.Message
+	var total int64
+	query := h.db.Model(&models.Message{}).Where("conversation_id = ?", conversationID)
+	query.Count(&total)
+	if err := query.Preload("Sender").Order("created_at asc").Scopes(paginate(q)).Find(&messages).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load messages"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": messages, "total": total, "page": q.Page, "limit": q.Limit})
+}
+
+func (h *MessageHandler) SendMessage(c *gin.Context) {
+	conversationID, ok := h.getConversationIDIfParticipant(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Body string `json:"body" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	body := strings.TrimSpace(req.Body)
+	if body == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message cannot be empty"})
+		return
+	}
+	if len(body) > 4000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message is too long"})
+		return
+	}
+	message := models.Message{ConversationID: conversationID, SenderID: getUserID(c), Body: body}
+	if err := h.db.Create(&message).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+		return
+	}
+	h.db.Model(&models.Conversation{}).Where("id = ?", conversationID).Update("updated_at", time.Now())
+	h.db.Preload("Sender").First(&message, message.ID)
+	c.JSON(http.StatusCreated, message)
+}
+
+func (h *MessageHandler) getConversationIDIfParticipant(c *gin.Context) (uint, bool) {
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation id"})
+		return 0, false
+	}
+	var count int64
+	h.db.Table("conversation_participants").
+		Where("conversation_id = ? AND user_id = ?", id, getUserID(c)).
+		Count(&count)
+	if count == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		return 0, false
+	}
+	return id, true
+}
+
 // ─── FILE ────────────────────────────────────────────
 
 type FileHandler struct {

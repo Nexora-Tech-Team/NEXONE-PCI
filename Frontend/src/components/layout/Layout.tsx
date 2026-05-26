@@ -2,9 +2,9 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RootState, AppDispatch } from '@/store'
-import { fetchMe, logoutAsync, canEdit, canRead } from '@/store/slices/authSlice'
+import { fetchMe, logoutAsync, canEdit, canRead, setUser } from '@/store/slices/authSlice'
 import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
-import { auditService, teamService } from '@/services/api'
+import { auditService, messageService, profileService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
 import pciLogoUrl from '../../../logo/Logo_PCI_Quality.svg'
@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
   TrendingUp, Menu, Search,
   Bell, Globe, Clock, Plus, LogOut, ChevronDown, ChevronRight, X, Megaphone,
-  LogIn, Check
+  LogIn, Check, UserRound, MessageSquare
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
@@ -45,6 +45,28 @@ type AuditItem = {
   user?: { name?: string }
 }
 
+type MessageUser = {
+  id: number
+  name: string
+  email: string
+  avatar?: string
+}
+
+type MessageNotice = {
+  id: number
+  body: string
+  sender_id: number
+  sender?: MessageUser
+  created_at: string
+}
+
+type ConversationNotice = {
+  id: number
+  participants: MessageUser[]
+  last_message?: MessageNotice
+  updated_at: string
+}
+
 type QuickAction = {
   id: string
   label: string
@@ -64,6 +86,7 @@ type LocaleOption = {
 
 const RECENT_VISITS_KEY = 'nexone.recent-visits'
 const ANNOUNCEMENTS_SEEN_KEY = 'nexone.announcements.last-seen'
+const MESSAGES_SEEN_KEY = 'nexone.messages.last-seen'
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'task', label: 'New task', description: 'Create and assign a task', to: '/tasks', menu: 'tasks', icon: CheckSquare },
@@ -190,6 +213,14 @@ export default function Layout() {
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
   const [lastAnnouncementsSeenAt, setLastAnnouncementsSeenAt] = useState(() => readStoredValue(ANNOUNCEMENTS_SEEN_KEY, ''))
+  const [messageConversations, setMessageConversations] = useState<ConversationNotice[]>([])
+  const [lastMessagesSeenAt, setLastMessagesSeenAt] = useState(() => readStoredValue(MESSAGES_SEEN_KEY, ''))
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    job_title: user?.job_title || '',
+    phone: user?.phone || '',
+  })
   const [isDesktop, setIsDesktop] = useState(() => (
     typeof window !== 'undefined'
       ? window.matchMedia('(min-width: 1024px)').matches
@@ -318,6 +349,28 @@ export default function Layout() {
     }).length
   }, [activeAnnouncements, lastAnnouncementsSeenAt])
 
+  const recentMessageNotifications = useMemo(() => (
+    messageConversations
+      .filter(item => item.last_message)
+      .sort((left, right) =>
+        new Date(right.last_message?.created_at || right.updated_at).getTime() -
+        new Date(left.last_message?.created_at || left.updated_at).getTime()
+      )
+      .slice(0, 5)
+  ), [messageConversations])
+
+  const unreadMessages = useMemo(() => {
+    const seenAt = lastMessagesSeenAt ? new Date(lastMessagesSeenAt).getTime() : 0
+    return recentMessageNotifications.filter(item => {
+      const last = item.last_message
+      if (!last || last.sender_id === user?.id) return false
+      const createdAt = new Date(last.created_at).getTime()
+      return !Number.isNaN(createdAt) && createdAt > seenAt
+    }).length
+  }, [lastMessagesSeenAt, recentMessageNotifications, user?.id])
+
+  const unreadNotifications = unreadAnnouncements + unreadMessages
+
   const toggleExpand = (id: string) => {
     setExpanded(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
@@ -417,6 +470,14 @@ export default function Layout() {
     }
   }, [activePanel, isDesktop])
 
+  useEffect(() => {
+    setProfileForm({
+      name: user?.name || '',
+      job_title: user?.job_title || '',
+      phone: user?.phone || '',
+    })
+  }, [user])
+
   // Call the backend logout endpoint so the JWT JTI is added to the
   // server-side blacklist, then clear local state via the Redux thunk.
   const handleLogout = async () => {
@@ -424,7 +485,18 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const userInitials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U'
+  const handleSaveProfile = async () => {
+    setProfileSaving(true)
+    try {
+      const res = await profileService.update(profileForm)
+      dispatch(setUser(res.data.user))
+      toast.success('Profile updated')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to update profile')
+    } finally {
+      setProfileSaving(false)
+    }
+  }
 
   const isDashVisible = canRead(permissions, user?.role, dashboardItem.menu)
   const canViewAuditTrail = canRead(permissions, user?.role, 'settings.audit-log')
@@ -461,24 +533,39 @@ export default function Layout() {
   const loadAnnouncements = useCallback(async (markAsSeen = false) => {
     setNotificationsLoading(true)
     try {
-      const response = await teamService.listAnnouncements()
-      const items = (response.data.data || [])
+      const [announcementResponse, conversationResponse] = await Promise.all([
+        teamService.listAnnouncements(),
+        messageService.listConversations(),
+      ])
+      const items = (announcementResponse.data.data || [])
         .slice()
         .sort((left: AnnouncementItem, right: AnnouncementItem) =>
           new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
         )
+      const conversations = (conversationResponse.data.data || [])
+        .slice()
+        .sort((left: ConversationNotice, right: ConversationNotice) =>
+          new Date(right.last_message?.created_at || right.updated_at).getTime() -
+          new Date(left.last_message?.created_at || left.updated_at).getTime()
+        )
 
       setAnnouncements(items)
+      setMessageConversations(conversations)
 
       if (markAsSeen) {
-        const latestSeenAt = items[0]?.created_at || new Date().toISOString()
-        setLastAnnouncementsSeenAt(latestSeenAt)
+        const now = new Date().toISOString()
+        const latestAnnouncementSeenAt = items[0]?.created_at || now
+        const latestMessageSeenAt = conversations[0]?.last_message?.created_at || now
+        setLastAnnouncementsSeenAt(latestAnnouncementSeenAt)
+        setLastMessagesSeenAt(latestMessageSeenAt)
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem(ANNOUNCEMENTS_SEEN_KEY, latestSeenAt)
+          window.localStorage.setItem(ANNOUNCEMENTS_SEEN_KEY, latestAnnouncementSeenAt)
+          window.localStorage.setItem(MESSAGES_SEEN_KEY, latestMessageSeenAt)
         }
       }
     } catch {
       setAnnouncements([])
+      setMessageConversations([])
     } finally {
       setNotificationsLoading(false)
     }
@@ -531,6 +618,13 @@ export default function Layout() {
 
   useEffect(() => {
     void loadAnnouncements()
+  }, [loadAnnouncements])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadAnnouncements()
+    }, 15000)
+    return () => window.clearInterval(timer)
   }, [loadAnnouncements])
 
   const handleSearchSubmit = () => {
@@ -610,9 +704,9 @@ export default function Layout() {
         aria-expanded={isActive}
       >
         <Icon size={16} />
-        {panel === 'notifications' && unreadAnnouncements > 0 && (
+        {panel === 'notifications' && unreadNotifications > 0 && (
           <span className="absolute right-1.5 top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-            {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+            {unreadNotifications > 9 ? '9+' : unreadNotifications}
           </span>
         )}
       </button>
@@ -726,8 +820,8 @@ export default function Layout() {
             v1.0.2
           </div>
           <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/5 px-3 py-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-primary">
-              {userInitials}
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white text-sm font-semibold text-primary">
+              <img src={pciLogoUrl} alt={user?.name || 'User'} className="h-8 w-auto object-contain" />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{user?.name}</p>
@@ -974,49 +1068,98 @@ export default function Layout() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
-                    <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
+                    <p className="text-xs text-gray-400">New chats and company announcements.</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleNavigate('/team/announcements')}
+                    onClick={() => handleNavigate('/messages')}
                     className="text-xs font-medium text-primary"
                   >
-                    {t('layout.viewAll', 'View all')}
+                    Messages
                   </button>
                 </div>
 
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-4">
                   {notificationsLoading ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                       {t('layout.loadingNotifications', 'Loading notifications...')}
                     </div>
-                  ) : activeAnnouncements.length === 0 ? (
+                  ) : activeAnnouncements.length === 0 && recentMessageNotifications.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      {t('layout.noAnnouncements', 'No announcements available.')}
+                      No notifications yet.
                     </div>
-                  ) : activeAnnouncements.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavigate('/team/announcements')}
-                      className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
+                  ) : (
+                    <>
+                      {recentMessageNotifications.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-700">{item.title}</p>
-                          {item.content && (
-                            <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>
-                          )}
+                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">New messages</p>
+                          <div className="space-y-2">
+                            {recentMessageNotifications.map(item => {
+                              const last = item.last_message
+                              const peer = item.participants.find(participant => participant.id !== user?.id) || last?.sender
+                              const isUnread = !!last && last.sender_id !== user?.id && new Date(last.created_at).getTime() > (lastMessagesSeenAt ? new Date(lastMessagesSeenAt).getTime() : 0)
+                              return (
+                                <button
+                                  key={`message-${item.id}`}
+                                  onClick={() => handleNavigate('/messages')}
+                                  className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                                      <MessageSquare size={14} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="truncate text-sm font-medium text-gray-700">{peer?.name || last?.sender?.name || 'Message'}</p>
+                                        {isUnread && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />}
+                                      </div>
+                                      <p className="mt-1 line-clamp-2 text-xs text-gray-500">{last?.body}</p>
+                                      <p className="mt-2 text-[11px] text-gray-400">{last ? formatDateTime(last.created_at, selectedLocale) : ''}</p>
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                        {lastAnnouncementsSeenAt && new Date(item.created_at) > new Date(lastAnnouncementsSeenAt) && (
-                          <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
-                        )}
-                      </div>
-                      <p className="mt-2 text-[11px] text-gray-400">
-                        {formatDateTime(item.created_at, selectedLocale)}
-                        {item.created_by?.name ? ` · ${item.created_by.name}` : ''}
-                      </p>
-                    </button>
-                  ))}
+                      )}
+                      {activeAnnouncements.length > 0 && (
+                        <div>
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Announcements</p>
+                            <button type="button" onClick={() => handleNavigate('/team/announcements')} className="text-xs font-medium text-primary">
+                              {t('layout.viewAll', 'View all')}
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {activeAnnouncements.map(item => (
+                              <button
+                                key={`announcement-${item.id}`}
+                                onClick={() => handleNavigate('/team/announcements')}
+                                className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700">{item.title}</p>
+                                    {item.content && (
+                                      <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>
+                                    )}
+                                  </div>
+                                  {lastAnnouncementsSeenAt && new Date(item.created_at) > new Date(lastAnnouncementsSeenAt) && (
+                                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                                  )}
+                                </div>
+                                <p className="mt-2 text-[11px] text-gray-400">
+                                  {formatDateTime(item.created_at, selectedLocale)}
+                                  {item.created_by?.name ? ` · ${item.created_by.name}` : ''}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1028,8 +1171,8 @@ export default function Layout() {
                 aria-expanded={profileOpen}
                 aria-haspopup="menu"
               >
-                <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={pciLogoUrl} alt="PCI Quality" className="h-8 w-auto object-contain" />
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
+                  <img src={pciLogoUrl} alt="PCI Quality" className="h-9 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>
@@ -1039,12 +1182,42 @@ export default function Layout() {
               </button>
 
               <div className={clsx(
-                'absolute right-0 top-[calc(100%+8px)] w-56 rounded-xl border border-gray-200 bg-white p-2 shadow-lg transition-all',
+                'absolute right-0 top-[calc(100%+8px)] w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-lg transition-all',
                 profileOpen ? 'visible translate-y-0 opacity-100' : 'invisible -translate-y-1 opacity-0'
               )}>
-                <div className="border-b border-gray-100 px-3 py-2">
-                  <p className="truncate text-sm font-semibold text-gray-800">{user?.name}</p>
-                  <p className="truncate text-xs text-gray-500">{user?.email}</p>
+                <div className="border-b border-gray-100 px-2 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-gray-100">
+                      <img src={pciLogoUrl} alt={user?.name || 'User'} className="h-10 w-auto object-contain" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-800">{user?.name}</p>
+                      <p className="truncate text-xs text-gray-500">{user?.email}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">Static profile avatar</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 border-b border-gray-100 px-2 py-3">
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-gray-500">Name</span>
+                    <input className="input mt-1 h-9" value={profileForm.name} onChange={e => setProfileForm(v => ({ ...v, name: e.target.value }))} />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-gray-500">Job title</span>
+                    <input className="input mt-1 h-9" value={profileForm.job_title} onChange={e => setProfileForm(v => ({ ...v, job_title: e.target.value }))} />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-gray-500">Phone</span>
+                    <input className="input mt-1 h-9" value={profileForm.phone} onChange={e => setProfileForm(v => ({ ...v, phone: e.target.value }))} />
+                  </label>
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={profileSaving}
+                    className="btn btn-primary w-full justify-center"
+                  >
+                    <UserRound size={14} />
+                    Save profile
+                  </button>
                 </div>
                 <button
                   onClick={handleLogout}
@@ -1231,30 +1404,59 @@ export default function Layout() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
-                  <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
+                  <p className="text-xs text-gray-400">New chats and company announcements.</p>
                 </div>
                 <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
-              <div className="mt-4 max-h-[70vh] space-y-2 overflow-y-auto">
+              <div className="mt-4 max-h-[70vh] space-y-4 overflow-y-auto">
                 {notificationsLoading ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                     {t('layout.loadingNotifications', 'Loading notifications...')}
                   </div>
-                ) : activeAnnouncements.length === 0 ? (
+                ) : activeAnnouncements.length === 0 && recentMessageNotifications.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                    {t('layout.noAnnouncements', 'No announcements available.')}
+                    No notifications yet.
                   </div>
-                ) : activeAnnouncements.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavigate('/team/announcements')}
-                    className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
-                  >
-                    <p className="text-sm font-medium text-gray-700">{item.title}</p>
-                    {item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>}
-                    <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
-                  </button>
-                ))}
+                ) : (
+                  <>
+                    {recentMessageNotifications.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">New messages</p>
+                        <div className="space-y-2">
+                          {recentMessageNotifications.map(item => (
+                            <button
+                              key={`mobile-message-${item.id}`}
+                              onClick={() => handleNavigate('/messages')}
+                              className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
+                            >
+                              <p className="text-sm font-medium text-gray-700">{item.last_message?.sender?.name || 'Message'}</p>
+                              <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.last_message?.body}</p>
+                              <p className="mt-2 text-[11px] text-gray-400">{item.last_message ? formatDateTime(item.last_message.created_at, selectedLocale) : ''}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {activeAnnouncements.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Announcements</p>
+                        <div className="space-y-2">
+                          {activeAnnouncements.map(item => (
+                            <button
+                              key={`mobile-announcement-${item.id}`}
+                              onClick={() => handleNavigate('/team/announcements')}
+                              className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
+                            >
+                              <p className="text-sm font-medium text-gray-700">{item.title}</p>
+                              {item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>}
+                              <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>

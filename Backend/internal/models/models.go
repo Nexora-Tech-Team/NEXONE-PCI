@@ -92,6 +92,24 @@ type User struct {
 	Leaves           []Leave    `json:"leaves,omitempty"`
 }
 
+// ─── MESSAGING ───────────────────────────────────────
+type Conversation struct {
+	Base
+	Title        string    `json:"title"`
+	IsGroup      bool      `gorm:"default:false" json:"is_group"`
+	Participants []User    `gorm:"many2many:conversation_participants;" json:"participants,omitempty"`
+	Messages     []Message `json:"messages,omitempty"`
+}
+
+type Message struct {
+	Base
+	ConversationID uint          `gorm:"index;not null" json:"conversation_id"`
+	Conversation   *Conversation `gorm:"foreignKey:ConversationID" json:"conversation,omitempty"`
+	SenderID       uint          `gorm:"index;not null" json:"sender_id"`
+	Sender         *User         `gorm:"foreignKey:SenderID" json:"sender,omitempty"`
+	Body           string        `gorm:"type:text;not null" json:"body"`
+}
+
 // ─── APP ROLE (Dynamic RBAC) ─────────────────────────
 type AppRole struct {
 	Base
@@ -420,51 +438,51 @@ type Label struct {
 // ─── QUOTATION ───────────────────────────────────────
 type Quotation struct {
 	Base
-	QuoteNumber      string         `json:"quote_number"`
-	Revision         int            `json:"revision" gorm:"default:1"`
-	Title            string         `json:"title"`
-	ClientID         uint           `json:"client_id"`
-	Client           *Client        `gorm:"foreignKey:ClientID" json:"client,omitempty"`
-	ProjectID        *uint          `json:"project_id"`
-	Project          *Project       `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
-	IssueDate        FlexTime       `json:"issue_date"`
-	ValidUntil       FlexTime       `json:"valid_until"`
-	MasaBerlaku      string         `json:"masa_berlaku"`
-	ContractNo       string         `json:"contract_no"`
-	Status           string         `gorm:"default:draft" json:"status"` // draft, sent, accepted, rejected, expired, converted
-	Currency         string         `gorm:"default:IDR" json:"currency"`
-	SubtotalAmount   float64        `json:"subtotal_amount"`
-	DiscountPct      float64        `json:"discount_pct"`
-	DiscountAmount   float64        `json:"discount_amount"`
-	TaxPct           float64        `json:"tax_pct"`
-	TaxAmount        float64        `json:"tax_amount"`
-	TotalAmount      float64        `json:"total_amount"`
-	PaymentTerms     string         `json:"payment_terms"`
-	ScopeSummary     string         `json:"scope_summary" gorm:"type:text"`
-	PreparedBy       string         `json:"prepared_by"`
-	PreparedByTitle  string         `json:"prepared_by_title"`
-	ApprovedBy       string         `json:"approved_by"`
-	ApprovedByTitle  string         `json:"approved_by_title"`
-	PIC              string         `json:"pic"`
-	ContactPhone     string         `json:"contact_phone"`
-	Terbilang        string         `json:"terbilang" gorm:"type:text"`
-	AcceptanceNotes  string         `json:"acceptance_notes" gorm:"type:text"`
-	Notes            string         `json:"notes" gorm:"type:text"`
-	Items            []QuotationItem `gorm:"foreignKey:QuotationID" json:"items,omitempty"`
-	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+	QuoteNumber     string          `json:"quote_number"`
+	Revision        int             `json:"revision" gorm:"default:1"`
+	Title           string          `json:"title"`
+	ClientID        uint            `json:"client_id"`
+	Client          *Client         `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	ProjectID       *uint           `json:"project_id"`
+	Project         *Project        `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	IssueDate       FlexTime        `json:"issue_date"`
+	ValidUntil      FlexTime        `json:"valid_until"`
+	MasaBerlaku     string          `json:"masa_berlaku"`
+	ContractNo      string          `json:"contract_no"`
+	Status          string          `gorm:"default:draft" json:"status"` // draft, sent, accepted, rejected, expired, converted
+	Currency        string          `gorm:"default:IDR" json:"currency"`
+	SubtotalAmount  float64         `json:"subtotal_amount"`
+	DiscountPct     float64         `json:"discount_pct"`
+	DiscountAmount  float64         `json:"discount_amount"`
+	TaxPct          float64         `json:"tax_pct"`
+	TaxAmount       float64         `json:"tax_amount"`
+	TotalAmount     float64         `json:"total_amount"`
+	PaymentTerms    string          `json:"payment_terms"`
+	ScopeSummary    string          `json:"scope_summary" gorm:"type:text"`
+	PreparedBy      string          `json:"prepared_by"`
+	PreparedByTitle string          `json:"prepared_by_title"`
+	ApprovedBy      string          `json:"approved_by"`
+	ApprovedByTitle string          `json:"approved_by_title"`
+	PIC             string          `json:"pic"`
+	ContactPhone    string          `json:"contact_phone"`
+	Terbilang       string          `json:"terbilang" gorm:"type:text"`
+	AcceptanceNotes string          `json:"acceptance_notes" gorm:"type:text"`
+	Notes           string          `json:"notes" gorm:"type:text"`
+	Items           []QuotationItem `gorm:"foreignKey:QuotationID" json:"items,omitempty"`
+	DeletedAt       gorm.DeletedAt  `gorm:"index" json:"-"`
 }
 
 type QuotationItem struct {
 	Base
-	QuotationID uint        `json:"quotation_id"`
-	Quotation   *Quotation  `gorm:"foreignKey:QuotationID" json:"quotation,omitempty"`
-	Description string      `json:"description"`
-	Quantity    float64     `json:"quantity"`
-	UnitPrice   float64     `json:"unit_price"`
-	Duration    float64     `json:"duration"`
-	DurationUnit string      `json:"duration_unit"` // day, month, year
-	Total       float64     `json:"total"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	QuotationID  uint           `json:"quotation_id"`
+	Quotation    *Quotation     `gorm:"foreignKey:QuotationID" json:"quotation,omitempty"`
+	Description  string         `json:"description"`
+	Quantity     float64        `json:"quantity"`
+	UnitPrice    float64        `json:"unit_price"`
+	Duration     float64        `json:"duration"`
+	DurationUnit string         `json:"duration_unit"` // day, month, year
+	Total        float64        `json:"total"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────

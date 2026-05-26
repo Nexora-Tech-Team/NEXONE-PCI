@@ -40,6 +40,8 @@ func (s *Server) setupRoutes() {
 
 	// ─── Auth (public) ───────────────────────────────
 	authH := handlers.NewAuthHandler(s.db, s.cfg)
+	profileH := handlers.NewProfileHandler(s.db, s.cfg.UploadDir)
+	api.GET("/profile/avatar/:filename", profileH.Avatar)
 	auth := api.Group("/auth")
 	{
 		auth.POST("/login", authH.Login)
@@ -56,6 +58,8 @@ func (s *Server) setupRoutes() {
 		protected.GET("/auth/me", authH.Me)
 		protected.POST("/auth/logout", authH.Logout)
 		protected.PUT("/auth/change-password", authH.ChangePassword)
+		protected.PUT("/profile", profileH.Update)
+		protected.POST("/profile/avatar", profileH.UploadAvatar)
 
 		// Dashboard
 		dashH := handlers.NewDashboardHandler(s.db)
@@ -217,6 +221,17 @@ func (s *Server) setupRoutes() {
 			notes.POST("", noteH.Create)
 			notes.PUT("/:id", noteH.Update)
 			notes.DELETE("/:id", noteH.Delete)
+		}
+
+		// Messages
+		messageH := handlers.NewMessageHandler(s.db)
+		messages := protected.Group("/messages")
+		{
+			messages.GET("/users", messageH.ListUsers)
+			messages.GET("/conversations", messageH.ListConversations)
+			messages.POST("/conversations", messageH.CreateConversation)
+			messages.GET("/conversations/:id/messages", messageH.ListMessages)
+			messages.POST("/conversations/:id/messages", messageH.SendMessage)
 		}
 
 		// Expenses

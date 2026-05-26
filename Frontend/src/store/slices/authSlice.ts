@@ -66,6 +66,11 @@ function saveSession(token: string, user: User, permissions: Permission[] | null
   other.removeItem('permissions')
 }
 
+function saveStoredUser(user: User) {
+  const storage = localStorage.getItem('token') ? localStorage : sessionStorage.getItem('token') ? sessionStorage : null
+  storage?.setItem('user', JSON.stringify(user))
+}
+
 export const login = createAsyncThunk(
   'auth/login',
   async (
@@ -113,6 +118,7 @@ const authSlice = createSlice({
     },
     setUser(state, action: PayloadAction<User>) {
       state.user = action.payload
+      saveStoredUser(action.payload)
     },
     setPermissions(state, action: PayloadAction<Permission[] | null>) {
       state.permissions = action.payload
