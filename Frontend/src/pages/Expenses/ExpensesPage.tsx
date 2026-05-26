@@ -9,12 +9,14 @@ import {
 
 const VIEWS = [{ key: 'expenses', label: 'Expenses' }, { key: 'recurring', label: 'Recurring' }]
 const CATEGORIES = ['Travel', 'Office', 'Software', 'Hardware', 'Marketing', 'Training', 'Meals', 'Other']
+const PAGE_SIZE = 30
 
 export default function ExpensesPage() {
   const [view, setView] = useState('expenses')
   const [expenses, setExpenses] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -48,10 +50,12 @@ export default function ExpensesPage() {
 
   useEffect(() => { load() }, [view])
   useEffect(() => {
-    if (!search) { setFiltered(expenses); return }
+    if (!search) { setFiltered(expenses); setPage(1); return }
     const q = search.toLowerCase()
     setFiltered(expenses.filter(e => e.title?.toLowerCase().includes(q) || e.category?.toLowerCase().includes(q)))
+    setPage(1)
   }, [search, expenses])
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const totalAmount = filtered.reduce((sum, e) => sum + (e.total || 0), 0)
 
@@ -122,7 +126,7 @@ export default function ExpensesPage() {
         }
       />
 
-      <ViewTabs tabs={VIEWS} active={view} onChange={v => { setView(v); setSearch('') }} />
+      <ViewTabs tabs={VIEWS} active={view} onChange={v => { setView(v); setSearch(''); setPage(1) }} />
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mb-4">
@@ -150,13 +154,14 @@ export default function ExpensesPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
+              <tr><th className="w-14">No.</th><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : filtered.map(e => (
+                ? <tr><td colSpan={10}><EmptyState /></td></tr>
+                : paginated.map((e, index) => (
                   <tr key={e.id}>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                     <td className="text-sm">{e.contract ? `${e.contract.contract_number}` : '-'}</td>
                     <td className="text-sm text-gray-500">{e.client?.name || '-'}</td>
@@ -184,6 +189,7 @@ export default function ExpensesPage() {
             </tbody>
           </table>
         )}
+        {!loading && <Pagination page={page} total={filtered.length} limit={PAGE_SIZE} onChange={setPage} />}
       </div>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Expense' : 'Add Expense'} size="lg"

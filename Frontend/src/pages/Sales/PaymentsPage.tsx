@@ -1,28 +1,39 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { paymentService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { FileDown, Printer, Trash2 } from 'lucide-react'
-import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog } from '@/components/common'
+import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog, Pagination } from '@/components/common'
+
+const PAGE_SIZE = 30
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const load = useCallback((q = '') => {
+  const load = (q = search, overridePage = page) => {
     setLoading(true)
-    paymentService.list(q ? { q } : undefined)
+    const params: any = { page: overridePage, limit: PAGE_SIZE }
+    if (q) params.q = q
+    paymentService.list(params)
       .then(r => { setPayments(r.data.data || []); setTotal(r.data.total || 0) })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false))
-  }, [])
+  }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(search) }, [page])
 
   useEffect(() => {
-    const timer = setTimeout(() => load(search), 300)
+    const timer = setTimeout(() => {
+      if (page === 1) {
+        load(search, 1)
+      } else {
+        setPage(1)
+      }
+    }, 300)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -73,13 +84,14 @@ export default function PaymentsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
+              <tr><th className="w-14">No.</th><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {payments.length === 0
-                ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : payments.map(p => (
+                ? <tr><td colSpan={8}><EmptyState /></td></tr>
+                : payments.map((p, index) => (
                   <tr key={p.id}>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="font-medium text-blue-600">{p.invoice?.invoice_number || '-'}</td>
                     <td className="text-gray-500">{p.invoice?.client?.name || '-'}</td>
                     <td className="whitespace-nowrap font-medium text-green-600">{fmt(p.amount, p.currency)}</td>
@@ -101,6 +113,7 @@ export default function PaymentsPage() {
             </tbody>
           </table>
         )}
+        {!loading && <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />}
       </div>
 
       <ConfirmDialog

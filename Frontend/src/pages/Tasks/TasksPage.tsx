@@ -73,7 +73,7 @@ const TASK_STATUSES: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'expired', label: 'Expired', color: 'bg-red-50' },
 ]
 
-const LIST_LIMIT = 10
+const LIST_LIMIT = 30
 
 const priorityColor: Record<string, string> = {
   high: 'text-red-500',
@@ -730,6 +730,7 @@ export default function TasksPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="w-14">No.</th>
                     <th>Title</th>
                     <th>Project</th>
                     <th>Assigned To</th>
@@ -743,17 +744,18 @@ export default function TasksPage() {
                   {tasks.length === 0
                     ? (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <EmptyState message="No tasks match the current filters." />
                         </td>
                       </tr>
                     )
-                    : tasks.map(task => (
+                    : tasks.map((task, index) => (
                       <tr
                         key={task.id}
                         className="cursor-pointer"
                         onClick={() => openEdit(task)}
                       >
+                        <td className="text-gray-400">{(page - 1) * LIST_LIMIT + index + 1}</td>
                         <td>
                           <div className="max-w-[280px]">
                             <p className="font-medium text-gray-900">{task.title}</p>

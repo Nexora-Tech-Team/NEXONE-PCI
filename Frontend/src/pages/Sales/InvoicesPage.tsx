@@ -10,6 +10,7 @@ import {
 } from '@/components/common'
 
 const STATUSES = ['draft', 'not_paid', 'partially_paid', 'fully_paid', 'overdue']
+const PAGE_SIZE = 30
 
 const getInvoiceSubtotal = (invoice: any) => {
   const subtotal = Number(invoice?.subtotal_amount ?? (Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) + Number(invoice?.discount_amount || 0)))
@@ -38,7 +39,7 @@ export default function InvoicesPage() {
 
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: PAGE_SIZE }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     invoiceService.list(params)
@@ -181,13 +182,14 @@ export default function InvoicesPage() {
           <>
             <table className="table">
               <thead>
-                <tr><th>Invoice #</th><th>Client</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
+                <tr><th className="w-14">No.</th><th>Invoice #</th><th>Client</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {invoices.length === 0
-                  ? <tr><td colSpan={9}><EmptyState /></td></tr>
-                  : invoices.map(inv => (
+                  ? <tr><td colSpan={10}><EmptyState /></td></tr>
+                  : invoices.map((inv, index) => (
                     <tr key={inv.id}>
+                      <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                       <td className="font-medium text-blue-600">{inv.invoice_number}</td>
                       <td className="text-gray-500">{inv.client?.name || '-'}</td>
                       <td className="text-gray-400 whitespace-nowrap">{inv.bill_date ? new Date(inv.bill_date).toLocaleDateString('id') : '-'}</td>
@@ -216,7 +218,7 @@ export default function InvoicesPage() {
                 }
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />
           </>
         )}
       </div>

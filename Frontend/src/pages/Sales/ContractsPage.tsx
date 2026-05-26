@@ -6,8 +6,10 @@ import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput, Pagination
 } from '@/components/common'
+
+const PAGE_SIZE = 30
 
 export default function ContractsPage() {
   const navigate = useNavigate()
@@ -15,6 +17,7 @@ export default function ContractsPage() {
   const [filtered, setFiltered] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -40,10 +43,12 @@ export default function ContractsPage() {
     projectService.list({ limit: 100 }).then(r => setProjects(r.data.data || [])).catch(() => {})
   }, [])
   useEffect(() => {
-    if (!search) { setFiltered(contracts); return }
+    if (!search) { setFiltered(contracts); setPage(1); return }
     const q = search.toLowerCase()
     setFiltered(contracts.filter(c => c.title?.toLowerCase().includes(q) || c.contract_number?.toLowerCase().includes(q)))
+    setPage(1)
   }, [search, contracts])
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const genContractNumber = () => `CTR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
 
@@ -109,13 +114,14 @@ export default function ContractsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Contract #</th><th>Title</th><th>Client</th><th>Date</th><th>Valid Until</th><th>Amount</th><th>Status</th><th></th></tr>
+              <tr><th className="w-14">No.</th><th>Contract #</th><th>Title</th><th>Client</th><th>Date</th><th>Valid Until</th><th>Amount</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                : filtered.map(c => (
+                ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                : paginated.map((c, index) => (
                   <tr key={c.id} className="cursor-pointer hover:bg-blue-50/50" onClick={() => navigate(`/sales/contracts/${c.id}`)}>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="font-medium text-blue-600">{c.contract_number}</td>
                     <td className="font-medium">{c.title}</td>
                     <td className="text-gray-500">{c.client?.name || '-'}</td>
@@ -137,6 +143,7 @@ export default function ContractsPage() {
             </tbody>
           </table>
         )}
+        {!loading && <Pagination page={page} total={filtered.length} limit={PAGE_SIZE} onChange={setPage} />}
       </div>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Contract' : 'Add Contract'} size="lg"

@@ -18,6 +18,7 @@ import {
 } from '@/components/common'
 
 const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted']
+const PAGE_SIZE = 30
 
 const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
 
@@ -71,7 +72,7 @@ export default function QuotationsPage() {
 
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: PAGE_SIZE }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     quotationService
@@ -275,6 +276,7 @@ export default function QuotationsPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="w-14">No.</th>
                   <th>Quote #</th>
                   <th>Rev</th>
                   <th>Title</th>
@@ -290,11 +292,12 @@ export default function QuotationsPage() {
               <tbody>
                 {quotations.length === 0 ? (
                   <tr>
-                    <td colSpan={10}><EmptyState message="No quotations yet." /></td>
+                    <td colSpan={11}><EmptyState message="No quotations yet." /></td>
                   </tr>
                 ) : (
-                  quotations.map((row) => (
+                  quotations.map((row, index) => (
                     <tr key={row.id}>
+                      <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                       <td className="font-medium text-blue-600">{row.quote_number}</td>
                       <td className="text-gray-400 text-xs">r{row.revision || 1}</td>
                       <td>{row.title}</td>
@@ -341,7 +344,7 @@ export default function QuotationsPage() {
                 )}
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />
           </>
         )}
       </div>
