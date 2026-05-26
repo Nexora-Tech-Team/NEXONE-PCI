@@ -14,7 +14,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to VPS via SSH
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare app directory on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          script: |
+            set -e
+            mkdir -p ~/nexora-node/apps/nexone-pci
+
+      - name: Upload source to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "."
+          target: "~/nexora-node/apps/nexone-pci"
+          rm: true
+
+      - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -25,11 +49,7 @@ jobs:
           script: |
             set -e
             cd ~/nexora-node/apps/nexone-pci
-            git branch -D deploy-tmp >/dev/null 2>&1 || true
-            git fetch origin main:deploy-tmp
-            git checkout main
-            git reset --hard deploy-tmp
-            git branch -D deploy-tmp
+            test -f .env || cp .env.example .env
             docker compose up -d --build
             docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
             docker ps --format '{{.Names}}' | grep '^nexone-pci-backend$'
