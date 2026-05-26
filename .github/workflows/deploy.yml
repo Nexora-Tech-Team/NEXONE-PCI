@@ -27,6 +27,9 @@ jobs:
           script: |
             set -e
             mkdir -p ~/nexora-node/apps/NEXONE-PCI
+            if [ -f ~/nexora-node/apps/NEXONE-PCI/.env ]; then
+              cp ~/nexora-node/apps/NEXONE-PCI/.env /tmp/nexone-pci.env
+            fi
 
       - name: Upload source to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -36,6 +39,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           source: "."
           target: "~/nexora-node/apps/NEXONE-PCI"
+          rm: true
 
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -48,8 +52,12 @@ jobs:
           script: |
             set -e
             cd ~/nexora-node/apps/NEXONE-PCI
+            if [ -f /tmp/nexone-pci.env ]; then
+              mv /tmp/nexone-pci.env .env
+            fi
             test -f .env || cp .env.example .env
             docker compose -f docker-compose.yml --env-file .env up -d --build
             docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
             docker ps --format '{{.Names}}' | grep '^nexone-pci-backend$'
             docker ps --format '{{.Names}}' | grep '^nexone-pci-frontend$'
+            docker exec nexone-pci-backend wget -qO- http://127.0.0.1:8080/health >/dev/null

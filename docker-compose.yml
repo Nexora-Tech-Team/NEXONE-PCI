@@ -52,7 +52,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.nexone-pci-api.rule=Host(`nexone-pci.nexoratech.co`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.nexone-pci-api.rule=Host(`nexone-pci.nexoratech.co`) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.nexone-pci-api.entrypoints=websecure"
       - "traefik.http.routers.nexone-pci-api.tls.certresolver=myresolver"
       - "traefik.http.services.nexone-pci-api.loadbalancer.server.port=8080"
