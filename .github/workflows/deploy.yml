@@ -12,7 +12,9 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,14 +24,21 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
           script_stop: true
           script: |
             set -e
-            mkdir -p ~/nexora-node/apps/NEXONE-PCI
-            if [ -f ~/nexora-node/apps/NEXONE-PCI/.env ]; then
-              cp ~/nexora-node/apps/NEXONE-PCI/.env /tmp/nexone-pci.env
+
+            APP_DIR=~/nexora-node/apps/NEXONE-PCI
+
+            mkdir -p $APP_DIR
+
+            if [ -f $APP_DIR/.env ]; then
+              cp $APP_DIR/.env /tmp/nexone-pci.env
+              echo "Existing .env backed up"
+            else
+              echo "No existing .env found"
             fi
 
       - name: Upload source to VPS
@@ -37,8 +46,8 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
           source: "."
           target: "~/nexora-node/apps/NEXONE-PCI"
           rm: true
@@ -48,19 +57,42 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
           script_stop: true
           command_timeout: 20m
           script: |
             set -e
-            cd ~/nexora-node/apps/NEXONE-PCI
+
+            APP_DIR=~/nexora-node/apps/NEXONE-PCI
+            cd $APP_DIR
+
             if [ -f /tmp/nexone-pci.env ]; then
               mv /tmp/nexone-pci.env .env
+              echo ".env restored"
             fi
-            test -f .env || cp .env.example .env
+
+            if [ ! -f .env ]; then
+              if [ -f .env.example ]; then
+                cp .env.example .env
+                echo ".env created from .env.example"
+              else
+                echo "ERROR: .env and .env.example not found"
+                exit 1
+              fi
+            fi
+
+            echo "Building and starting containers..."
             docker compose -f docker-compose.yml --env-file .env up -d --build
-            docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
-            docker ps --format '{{.Names}}' | grep '^nexone-pci-backend$'
-            docker ps --format '{{.Names}}' | grep '^nexone-pci-frontend$'
-            docker exec nexone-pci-backend wget -qO- http://127.0.0.1:8080/health >/dev/null
+
+            echo "Checking containers..."
+            docker compose ps
+
+            docker ps --format '{{.Names}}' | grep -q '^nexone-pci-postgres$'
+            docker ps --format '{{.Names}}' | grep -q '^nexone-pci-backend$'
+            docker ps --format '{{.Names}}' | grep -q '^nexone-pci-frontend$'
+
+            echo "Running backend health check..."
+            docker exec nexone-pci-backend wget -qO- http://127.0.0.1:8080/health > /dev/null
+
+            echo "Deploy NEXONE PCI completed successfully"
