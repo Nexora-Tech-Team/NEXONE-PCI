@@ -26,7 +26,7 @@ jobs:
           script_stop: true
           script: |
             set -e
-            mkdir -p ~/nexora-node/apps/nexone-pci
+            mkdir -p ~/nexora-node/apps/NEXONE-PCI
 
       - name: Upload source to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -35,8 +35,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "."
-          target: "~/nexora-node/apps/nexone-pci"
-          rm: true
+          target: "~/nexora-node/apps/NEXONE-PCI"
 
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -48,7 +47,7 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
-            cd ~/nexora-node/apps/nexone-pci
+            cd ~/nexora-node/apps/NEXONE-PCI
             test -f .env || cp .env.example .env
             docker compose up -d --build
             docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
