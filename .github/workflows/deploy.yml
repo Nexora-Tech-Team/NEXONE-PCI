@@ -49,7 +49,7 @@ jobs:
             set -e
             cd ~/nexora-node/apps/NEXONE-PCI
             test -f .env || cp .env.example .env
-            docker compose up -d --build
+            docker compose -f docker-compose.yml up -d --build
             docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
             docker ps --format '{{.Names}}' | grep '^nexone-pci-backend$'
             docker ps --format '{{.Names}}' | grep '^nexone-pci-frontend$'
