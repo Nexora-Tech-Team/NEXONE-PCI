@@ -96,6 +96,20 @@ jobs:
             docker ps --format '{{.Names}}' | grep -q '^nexone-pci-frontend$'
 
             echo "Running backend health check..."
-            docker exec nexone-pci-backend wget -qO- http://127.0.0.1:8080/health > /dev/null
+            for i in $(seq 1 30); do
+              if docker exec nexone-pci-backend wget -qO- http://127.0.0.1:8080/health > /dev/null 2>&1; then
+                echo "Backend health check passed"
+                break
+              fi
+
+              if [ "$i" -eq 30 ]; then
+                echo "Backend health check failed after 30 attempts"
+                docker logs --tail=100 nexone-pci-backend
+                exit 1
+              fi
+
+              echo "Backend not ready yet, retrying ($i/30)..."
+              sleep 2
+            done
 
             echo "Deploy NEXONE PCI completed successfully"
