@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
   <title id="title">PCI Quality</title>
   <desc id="desc">Red PCI Quality logo with a hexagon badge.</desc>
-  <rect width="320" height="320" fill="#ffffff"/>
   <g fill="none" stroke="#ed1b2f" stroke-linejoin="round">
     <path d="M160 35 239 80.5v91L160 217 81 171.5v-91L160 35Z" fill="#ed1b2f" stroke-width="0"/>
     <path d="M160 49 226.5 87.5v77L160 203 93.5 164.5v-77L160 49Z" stroke="#ffffff" stroke-width="7"/>

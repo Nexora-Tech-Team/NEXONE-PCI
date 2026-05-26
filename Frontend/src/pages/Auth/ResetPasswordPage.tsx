@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       <div className="w-full lg:w-[40%] xl:w-[38%] flex flex-col justify-center">
         <div className="w-full px-10 xl:px-16 py-12">
           <div className="mb-10">
-            <img src={pciLogoUrl} alt="PCI Quality" className="h-[220px] w-auto object-contain" />
+            <img src={pciLogoUrl} alt="PCI Quality" className="h-[150px] w-auto object-contain" />
           </div>
 
           <div className="flex justify-center mb-5">

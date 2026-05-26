@@ -153,7 +153,7 @@ export default function LoginPage() {
             <div className="absolute inset-0 rounded-full"
                  style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.4), transparent 70%)',
                           filter: 'blur(20px)', transform: 'scale(1.8)' }} />
-            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoPulse relative h-24 w-auto object-contain" />
+            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoPulse relative h-20 w-auto object-contain" />
           </div>
           <p className="mt-4 text-xs font-medium tracking-[0.25em] uppercase text-blue-200/50">Business Platform</p>
 
@@ -267,8 +267,8 @@ export default function LoginPage() {
       ══════════════════════════════════════════════ */}
       <div className="hidden lg:flex min-h-screen w-full flex-row">
         <div className="anim-fadeInLeft relative flex min-h-screen w-[30%] flex-col bg-white">
-          <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
-            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoDesktop h-[240px] w-auto object-contain"/>
+          <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-8 lg:-translate-x-1/2">
+            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoDesktop h-[148px] w-auto object-contain"/>
           </div>
           <div className="flex flex-1 flex-col justify-center px-16 py-12">
             <div className="w-full max-w-[420px]">
