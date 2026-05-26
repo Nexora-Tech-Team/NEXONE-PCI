@@ -1,4 +1,4 @@
-name: Deploy NEXONE
+name: Deploy NEXONE PCI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: nexone-production-deploy
+  group: nexone-pci-production-deploy
   cancel-in-progress: true
 
 jobs:
@@ -24,12 +24,13 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
-            cd ~/nexora-node/apps/nexone
+            cd ~/nexora-node/apps/nexone-pci
             git branch -D deploy-tmp >/dev/null 2>&1 || true
             git fetch origin main:deploy-tmp
             git checkout main
             git reset --hard deploy-tmp
             git branch -D deploy-tmp
-            docker compose up -d --build --no-deps backend frontend
-            docker ps --format '{{.Names}}' | grep '^nexone-backend$'
-            docker ps --format '{{.Names}}' | grep '^nexone-frontend$'
+            docker compose up -d --build
+            docker ps --format '{{.Names}}' | grep '^nexone-pci-postgres$'
+            docker ps --format '{{.Names}}' | grep '^nexone-pci-backend$'
+            docker ps --format '{{.Names}}' | grep '^nexone-pci-frontend$'
