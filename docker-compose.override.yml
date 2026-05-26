@@ -1,9 +1,15 @@
 services:
   postgres:
-    container_name: pusintek-nexone-postgres
+    container_name: nexone-pci-postgres
+    ports:
+      - "5440:5432"
 
   backend:
-    container_name: pusintek-nexone-backend
+    container_name: nexone-pci-backend
+    ports:
+      - "8091:8080"
 
   frontend:
-    container_name: pusintek-nexone-frontend
+    container_name: nexone-pci-frontend
+    ports:
+      - "3010:80"

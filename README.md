@@ -43,6 +43,25 @@ cbqa/
 ### Prerequisites
 - Docker & Docker Compose installed
 
+### NEXONE-PCI Local Ports
+
+This clone is separated from other local NEXONE projects with dedicated
+container names, volumes, database name, and host ports:
+
+| Service | Local URL / Port |
+|---------|------------------|
+| Frontend | http://localhost:3010 |
+| Backend | http://localhost:8091 |
+| PostgreSQL | localhost:5440 |
+
+Production domain: https://nexone-pci.nexoratech.co
+
+Use `.env.example` as the local environment template:
+
+```bash
+cp .env.example .env
+```
+
 ### Steps
 
 ```bash
@@ -266,4 +285,3 @@ Jalankan dengan: docker-compose --profile tools up
 Role	Email	Password
 Admin	admin@cbqa.com	Admin123!
 Member	fauzi@cbqa.com	Member123!
-

@@ -2,7 +2,7 @@ services:
   # ─── PostgreSQL ──────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: nexone-postgres
+    container_name: nexone-pci-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -22,7 +22,7 @@ services:
   backend:
     build:
       context: ./Backend
-    container_name: nexone-backend
+    container_name: nexone-pci-backend
     restart: unless-stopped
     environment:
       PORT: 8080
@@ -52,10 +52,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.sambernyawa-api.rule=Host(`sambernyawa.nexoratech.co`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.sambernyawa-api.entrypoints=websecure"
-      - "traefik.http.routers.sambernyawa-api.tls.certresolver=myresolver"
-      - "traefik.http.services.sambernyawa-api.loadbalancer.server.port=8080"
+      - "traefik.http.routers.nexone-pci-api.rule=Host(`nexone-pci.nexoratech.co`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.nexone-pci-api.entrypoints=websecure"
+      - "traefik.http.routers.nexone-pci-api.tls.certresolver=myresolver"
+      - "traefik.http.services.nexone-pci-api.loadbalancer.server.port=8080"
 
   # ─── Frontend ────────────────────────────────────────
   frontend:
@@ -66,7 +66,7 @@ services:
         # Passing them as runtime `environment:` has no effect on the built
         # assets.  Use build args here so the Dockerfile ARG picks them up.
         VITE_API_URL: ${VITE_API_URL:-/api/v1}
-    container_name: nexone-frontend
+    container_name: nexone-pci-frontend
     restart: unless-stopped
     depends_on:
       - backend
@@ -76,10 +76,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.sambernyawa.rule=Host(`sambernyawa.nexoratech.co`)"
-      - "traefik.http.routers.sambernyawa.entrypoints=websecure"
-      - "traefik.http.routers.sambernyawa.tls.certresolver=myresolver"
-      - "traefik.http.services.sambernyawa.loadbalancer.server.port=80"
+      - "traefik.http.routers.nexone-pci.rule=Host(`nexone-pci.nexoratech.co`)"
+      - "traefik.http.routers.nexone-pci.entrypoints=websecure"
+      - "traefik.http.routers.nexone-pci.tls.certresolver=myresolver"
+      - "traefik.http.services.nexone-pci.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:
