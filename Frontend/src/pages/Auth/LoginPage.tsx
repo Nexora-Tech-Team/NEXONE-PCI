@@ -6,7 +6,7 @@ import { RootState, AppDispatch } from '@/store'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 import frameKananUrl from '../../../logo/FrameKanan.png'
-import nexoraPartUrl from '../../../logo/Logo_Nexora_Part.png'
+import pciLogoUrl from '../../../logo/Logo_PCI_Quality.svg'
 
 const mobileStyles = `
   @keyframes orbPulse {
@@ -153,7 +153,7 @@ export default function LoginPage() {
             <div className="absolute inset-0 rounded-full"
                  style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.4), transparent 70%)',
                           filter: 'blur(20px)', transform: 'scale(1.8)' }} />
-            <img src={nexoraPartUrl} alt="Nexora" className="anim-logoPulse relative h-20 w-auto object-contain" />
+            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoPulse relative h-24 w-auto object-contain" />
           </div>
           <p className="mt-4 text-xs font-medium tracking-[0.25em] uppercase text-blue-200/50">Business Platform</p>
 
@@ -257,7 +257,7 @@ export default function LoginPage() {
                   : 'Sign in'}
               </button>
             </form>
-            <p className="mt-4 text-center text-[10px] text-gray-300">© 2026 NEXORA. All rights reserved.</p>
+            <p className="mt-4 text-center text-[10px] text-gray-300">© 2026 PCI Quality. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -268,7 +268,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex min-h-screen w-full flex-row">
         <div className="anim-fadeInLeft relative flex min-h-screen w-[30%] flex-col bg-white">
           <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
-            <img src={nexoraPartUrl} alt="Nexora" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
+            <img src={pciLogoUrl} alt="PCI Quality" className="anim-logoDesktop h-[240px] w-auto object-contain"/>
           </div>
           <div className="flex flex-1 flex-col justify-center px-16 py-12">
             <div className="w-full max-w-[420px]">
@@ -315,7 +315,7 @@ export default function LoginPage() {
               </form>
             </div>
           </div>
-          <div className="px-16 pb-8"><p className="text-[11px] text-gray-300">© 2026 NEXORA. All rights reserved.</p></div>
+          <div className="px-16 pb-8"><p className="text-[11px] text-gray-300">© 2026 PCI Quality. All rights reserved.</p></div>
         </div>
         <div className="anim-fadeInRight flex flex-1 relative overflow-hidden items-center justify-center">
           <img src={frameKananUrl} alt="" className="anim-bgDrift absolute inset-0 w-full h-full object-cover object-left-top"
