@@ -277,9 +277,13 @@ export function Avatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'md'
 
 // ─── ProgressBar ─────────────────────────────────────
 export function ProgressBar({ value, className }: { value: number; className?: string }) {
+  const pct = Math.min(Math.max(value || 0, 0), 100)
   return (
-    <div className={clsx('progress-bar', className)}>
-      <div className="progress-fill" style={{ width: `${Math.min(value, 100)}%` }} />
+    <div className={clsx('flex items-center gap-2', className)}>
+      <div className="progress-bar flex-1">
+        <div className="progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-gray-500 whitespace-nowrap">{pct}%</span>
     </div>
   )
 }

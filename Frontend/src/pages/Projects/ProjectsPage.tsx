@@ -133,16 +133,16 @@ export default function ProjectsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th><th>Title</th><th>Client</th><th>Price</th>
+                  <th>No</th><th>Title</th><th>Client</th><th>Price</th>
                   <th>Start date</th><th>Deadline</th><th>Progress</th><th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
                 {projects.length === 0
                   ? <tr><td colSpan={9}><EmptyState /></td></tr>
-                  : projects.map(p => (
+                  : projects.map((p, i) => (
                     <tr key={p.id}>
-                      <td className="text-gray-400">{p.id}</td>
+                      <td className="text-gray-400">{(page - 1) * 10 + i + 1}</td>
                       <td>
                         <Link to={`/projects/${p.id}`} className="text-blue-600 hover:underline font-medium">{p.title}</Link>
                         <div className="flex flex-wrap gap-1 mt-1">
