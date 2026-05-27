@@ -115,7 +115,7 @@ export default function ItemsPage() {
                     </td>
                     <td className="text-gray-500">{item.category || '-'}</td>
                     <td className="text-gray-400">{item.unit_type || '-'}</td>
-                    <td className="font-medium whitespace-nowrap">{Number(item.rate).toLocaleString()}</td>
+                    <td className="font-medium whitespace-nowrap">{Number(item.rate).toLocaleString('id-ID')}</td>
                     <td className="text-gray-400">{item.currency}</td>
                     <td>
                       <div className="flex gap-1">

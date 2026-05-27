@@ -512,7 +512,7 @@ export default function ClientDetailPage() {
                     <td className="font-medium" style={{ color: '#2aacb8' }}>{inv.invoice_number}</td>
                     <td className="text-gray-400">{new Date(inv.bill_date).toLocaleDateString('id')}</td>
                     <td className="text-gray-400">{new Date(inv.due_date).toLocaleDateString('id')}</td>
-                    <td className="whitespace-nowrap">{inv.currency} {Number(inv.total_amount).toLocaleString()}</td>
+                    <td className="whitespace-nowrap">{inv.currency} {Number(inv.total_amount).toLocaleString('id-ID')}</td>
                     <td><StatusBadge status={inv.status} /></td>
                   </tr>
                 ))

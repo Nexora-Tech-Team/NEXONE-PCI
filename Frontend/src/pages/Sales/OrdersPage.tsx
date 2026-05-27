@@ -98,7 +98,7 @@ export default function OrdersPage() {
                     <td className="font-medium text-blue-600">{o.order_number}</td>
                     <td className="text-gray-500">{o.client?.name || '-'}</td>
                     <td className="text-gray-400 whitespace-nowrap">{o.order_date ? new Date(o.order_date).toLocaleDateString('id') : '-'}</td>
-                    <td className="whitespace-nowrap font-medium">{o.currency} {Number(o.amount).toLocaleString()}</td>
+                    <td className="whitespace-nowrap font-medium">{o.currency} {Number(o.amount).toLocaleString('id-ID')}</td>
                     <td><StatusBadge status={o.status} /></td>
                     <td>
                       <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(o.id)}>×</button>

@@ -62,6 +62,12 @@ func Migrate(db *gorm.DB) error {
 		&models.Announcement{},
 		&models.TimeCard{},
 		&models.File{},
+		&models.AssetCategory{},
+		&models.AssetLocation{},
+		&models.Asset{},
+		&models.AssetAssignment{},
+		&models.AssetMovement{},
+		&models.AssetMaintenance{},
 		&models.Todo{},
 		&models.Label{},
 		&models.Quotation{},
@@ -92,7 +98,10 @@ func Migrate(db *gorm.DB) error {
 		), 0)
 	`)
 
-	return seedTaskKanbanColumns(db)
+	if err := seedTaskKanbanColumns(db); err != nil {
+		return err
+	}
+	return seedAssetDefaults(db)
 }
 
 func seedTaskKanbanColumns(db *gorm.DB) error {
@@ -149,5 +158,49 @@ func seedTaskKanbanColumns(db *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+func seedAssetDefaults(db *gorm.DB) error {
+	categories := map[string]string{
+		"Laptop":         "Notebook and portable computers",
+		"Desktop":        "Desktop computers and workstations",
+		"Network Device": "Routers, switches, access points, and firewalls",
+		"Printer":        "Printers, scanners, and office peripherals",
+		"Furniture":      "Office furniture and fixtures",
+		"Software":       "Licensed software and subscriptions",
+		"Other":          "Other company assets",
+	}
+	for name, description := range categories {
+		db.Exec(`
+			DELETE FROM asset_categories
+			WHERE name = ? AND description = ?
+			  AND deleted_at IS NULL
+			  AND NOT EXISTS (
+			    SELECT 1 FROM assets
+			    WHERE assets.category_id = asset_categories.id
+			      AND assets.deleted_at IS NULL
+			  )
+		`, name, description)
+	}
+
+	locations := map[string]string{
+		"Head Office": "Main office inventory",
+		"Storage":     "Stock room and spare assets",
+		"Data Center": "Server and network equipment area",
+		"Client Site": "Assets placed at client locations",
+	}
+	for name, description := range locations {
+		db.Exec(`
+			DELETE FROM asset_locations
+			WHERE name = ? AND description = ?
+			  AND deleted_at IS NULL
+			  AND NOT EXISTS (
+			    SELECT 1 FROM assets
+			    WHERE assets.location_id = asset_locations.id
+			      AND assets.deleted_at IS NULL
+			  )
+		`, name, description)
+	}
 	return nil
 }

@@ -270,7 +270,7 @@ export default function ReportsPage() {
                     ].map(kpi => (
                       <div key={kpi.label} className="bg-white border border-gray-200 rounded-lg p-4">
                         <p className="text-xs text-gray-400 mb-1">{kpi.label} ({year})</p>
-                        <p className={`text-xl font-bold ${kpi.color}`}>IDR {kpi.value.toLocaleString()}</p>
+                        <p className={`text-xl font-bold ${kpi.color}`}>IDR {kpi.value.toLocaleString('id-ID')}</p>
                       </div>
                     ))}
                   </div>
@@ -283,7 +283,7 @@ export default function ReportsPage() {
                           <BarChart data={invoicesSummary} margin={{ top: 5, right: 10, left: 10, bottom: 60 }}>
                             <XAxis dataKey="client_name" angle={-35} textAnchor="end" tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v / 1e6).toFixed(0) + 'M'} />
-                            <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString()}`} />
+                            <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString('id-ID')}`} />
                             <Legend verticalAlign="top" />
                             <Bar dataKey="invoice_total" name="Total Invoiced" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                             <Bar dataKey="payment_received" name="Received" fill="#10b981" radius={[3, 3, 0, 0]} />
@@ -304,9 +304,9 @@ export default function ReportsPage() {
                             <tr key={i}>
                               <td className="font-medium">{row.client_name}</td>
                               <td className="text-center text-gray-400">{row.count}</td>
-                              <td className="whitespace-nowrap">IDR {Number(row.invoice_total).toLocaleString()}</td>
-                              <td className="whitespace-nowrap text-green-600">IDR {Number(row.payment_received).toLocaleString()}</td>
-                              <td className="whitespace-nowrap text-red-500">IDR {Number(row.due).toLocaleString()}</td>
+                              <td className="whitespace-nowrap">IDR {Number(row.invoice_total).toLocaleString('id-ID')}</td>
+                              <td className="whitespace-nowrap text-green-600">IDR {Number(row.payment_received).toLocaleString('id-ID')}</td>
+                              <td className="whitespace-nowrap text-red-500">IDR {Number(row.due).toLocaleString('id-ID')}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -314,9 +314,9 @@ export default function ReportsPage() {
                           <tr>
                             <td>Total</td>
                             <td className="text-center">{invoicesSummary.reduce((a, r) => a + r.count, 0)}</td>
-                            <td className="whitespace-nowrap text-blue-600">IDR {summaryTotals.total.toLocaleString()}</td>
-                            <td className="whitespace-nowrap text-green-600">IDR {summaryTotals.received.toLocaleString()}</td>
-                            <td className="whitespace-nowrap text-red-500">IDR {summaryTotals.due.toLocaleString()}</td>
+                            <td className="whitespace-nowrap text-blue-600">IDR {summaryTotals.total.toLocaleString('id-ID')}</td>
+                            <td className="whitespace-nowrap text-green-600">IDR {summaryTotals.received.toLocaleString('id-ID')}</td>
+                            <td className="whitespace-nowrap text-red-500">IDR {summaryTotals.due.toLocaleString('id-ID')}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -350,9 +350,9 @@ export default function ReportsPage() {
                               <td className="whitespace-nowrap text-xs text-gray-500">
                                 {inv.due_date ? new Date(inv.due_date).toLocaleDateString('id-ID') : '-'}
                               </td>
-                              <td className="whitespace-nowrap text-xs">IDR {Number(inv.total_amount || 0).toLocaleString()}</td>
-                              <td className="whitespace-nowrap text-xs text-green-600">IDR {Number(inv.paid_amount || 0).toLocaleString()}</td>
-                              <td className="whitespace-nowrap text-xs text-red-500">IDR {Number(inv.due_amount || 0).toLocaleString()}</td>
+                              <td className="whitespace-nowrap text-xs">IDR {Number(inv.total_amount || 0).toLocaleString('id-ID')}</td>
+                              <td className="whitespace-nowrap text-xs text-green-600">IDR {Number(inv.paid_amount || 0).toLocaleString('id-ID')}</td>
+                              <td className="whitespace-nowrap text-xs text-red-500">IDR {Number(inv.due_amount || 0).toLocaleString('id-ID')}</td>
                               <td>
                                 <span
                                   className="px-2 py-0.5 rounded-full text-xs font-medium capitalize"
@@ -371,13 +371,13 @@ export default function ReportsPage() {
                           <tr>
                             <td colSpan={5}>Total ({invoicesDetail.length} invoices)</td>
                             <td className="whitespace-nowrap text-blue-600">
-                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.total_amount || 0), 0).toLocaleString()}
+                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.total_amount || 0), 0).toLocaleString('id-ID')}
                             </td>
                             <td className="whitespace-nowrap text-green-600">
-                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.paid_amount || 0), 0).toLocaleString()}
+                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.paid_amount || 0), 0).toLocaleString('id-ID')}
                             </td>
                             <td className="whitespace-nowrap text-red-500">
-                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.due_amount || 0), 0).toLocaleString()}
+                              IDR {invoicesDetail.reduce((a: number, r: any) => a + (r.due_amount || 0), 0).toLocaleString('id-ID')}
                             </td>
                             <td />
                           </tr>
@@ -411,7 +411,7 @@ export default function ReportsPage() {
                     ].map(kpi => (
                       <div key={kpi.label} className={`bg-white border rounded-lg p-4 ${kpi.bg}`}>
                         <p className="text-xs text-gray-400 mb-1">{kpi.label} ({year})</p>
-                        <p className={`text-xl font-bold ${kpi.color}`}>IDR {kpi.value.toLocaleString()}</p>
+                        <p className={`text-xl font-bold ${kpi.color}`}>IDR {kpi.value.toLocaleString('id-ID')}</p>
                       </div>
                     ))}
                   </div>
@@ -423,7 +423,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v === 0 ? '0' : (v / 1e6).toFixed(0) + 'M'} />
-                        <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString()}`} />
+                        <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString('id-ID')}`} />
                         <Legend verticalAlign="top" />
                         <Bar dataKey="income" name="Income" fill="#10b981" radius={[3, 3, 0, 0]} />
                         <Bar dataKey="expense" name="Expenses" fill="#ef4444" radius={[3, 3, 0, 0]} />
@@ -438,7 +438,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v === 0 ? '0' : (v / 1e6).toFixed(0) + 'M'} />
-                        <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString()}`} />
+                        <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString('id-ID')}`} />
                         <Line type="monotone" dataKey="net" name="Net" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -453,7 +453,7 @@ export default function ReportsPage() {
                     <div className="bg-white border border-gray-200 rounded-lg p-4">
                       <p className="text-xs text-gray-400 mb-1">Total Expenses (All Time)</p>
                       <p className="text-2xl font-bold text-red-500">
-                        IDR {expenses.reduce((s, e) => s + (e.total || e.amount || 0), 0).toLocaleString()}
+                        IDR {expenses.reduce((s, e) => s + (e.total || e.amount || 0), 0).toLocaleString('id-ID')}
                       </p>
                     </div>
                     <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -484,7 +484,7 @@ export default function ReportsPage() {
                                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                 ))}
                               </Pie>
-                              <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString()}`} />
+                              <Tooltip formatter={(v: any) => `IDR ${Number(v).toLocaleString('id-ID')}`} />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
@@ -505,7 +505,7 @@ export default function ReportsPage() {
                                       {row.name}
                                     </td>
                                     <td className="text-gray-400">{count}</td>
-                                    <td className="whitespace-nowrap text-red-500">IDR {row.value.toLocaleString()}</td>
+                                    <td className="whitespace-nowrap text-red-500">IDR {row.value.toLocaleString('id-ID')}</td>
                                     <td className="text-gray-500">{pct}%</td>
                                   </tr>
                                 )
@@ -516,7 +516,7 @@ export default function ReportsPage() {
                                 <td>Total</td>
                                 <td>{expenses.length}</td>
                                 <td className="whitespace-nowrap text-red-500">
-                                  IDR {expenses.reduce((s, e) => s + (e.total || e.amount || 0), 0).toLocaleString()}
+                                  IDR {expenses.reduce((s, e) => s + (e.total || e.amount || 0), 0).toLocaleString('id-ID')}
                                 </td>
                                 <td>100%</td>
                               </tr>
@@ -553,7 +553,7 @@ export default function ReportsPage() {
                       <div key={kpi.label} className="bg-white border border-gray-200 rounded-lg p-4">
                         <p className="text-xs text-gray-400 mb-1">{kpi.label}</p>
                         <p className={`text-xl font-bold ${kpi.color}`}>
-                          {kpi.isCurrency ? `IDR ${kpi.value.toLocaleString()}` : kpi.value}
+                          {kpi.isCurrency ? `IDR ${kpi.value.toLocaleString('id-ID')}` : kpi.value}
                         </p>
                       </div>
                     ))}
@@ -592,7 +592,7 @@ export default function ReportsPage() {
                                   </span>
                                 </td>
                                 <td className="whitespace-nowrap font-medium text-green-600">
-                                  IDR {Number(p.amount || 0).toLocaleString()}
+                                  IDR {Number(p.amount || 0).toLocaleString('id-ID')}
                                 </td>
                                 <td className="text-xs text-gray-400 max-w-[180px] truncate">{p.note || '-'}</td>
                               </tr>
@@ -602,7 +602,7 @@ export default function ReportsPage() {
                             <tr>
                               <td colSpan={5}>Total ({payments.length} payments)</td>
                               <td className="whitespace-nowrap text-green-600">
-                                IDR {payments.reduce((s: number, p: any) => s + (p.amount || 0), 0).toLocaleString()}
+                                IDR {payments.reduce((s: number, p: any) => s + (p.amount || 0), 0).toLocaleString('id-ID')}
                               </td>
                               <td />
                             </tr>

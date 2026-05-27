@@ -129,7 +129,7 @@ export default function ContractsPage() {
                     <td className={`${new Date(c.valid_until) < new Date() && c.status !== 'completed' ? 'text-red-500' : 'text-gray-400'}`}>
                       {c.valid_until ? new Date(c.valid_until).toLocaleDateString('id') : '-'}
                     </td>
-                    <td className="whitespace-nowrap">{c.currency} {Number(c.amount).toLocaleString()}</td>
+                    <td className="whitespace-nowrap">{c.currency} {Number(c.amount).toLocaleString('id-ID')}</td>
                     <td><StatusBadge status={c.status} /></td>
                     <td>
                       <div className="flex gap-1">

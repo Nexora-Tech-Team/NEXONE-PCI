@@ -51,7 +51,7 @@ export default function PaymentsPage() {
       })
   }
 
-  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString()}`
+  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString('id-ID')}`
   const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
 
   return (

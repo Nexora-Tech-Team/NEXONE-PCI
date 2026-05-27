@@ -417,6 +417,83 @@ type File struct {
 	Owner      *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 }
 
+// ─── ASSET MANAGEMENT ────────────────────────────────
+type AssetCategory struct {
+	Base
+	Name        string `gorm:"not null;uniqueIndex" json:"name"`
+	Description string `json:"description"`
+}
+
+type AssetLocation struct {
+	Base
+	Name        string `gorm:"not null;uniqueIndex" json:"name"`
+	Code        string `json:"code"`
+	Description string `json:"description"`
+}
+
+type Asset struct {
+	Base
+	AssetCode      string         `gorm:"uniqueIndex;not null" json:"asset_code"`
+	Name           string         `gorm:"not null" json:"name"`
+	CategoryID     *uint          `json:"category_id"`
+	Category       *AssetCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	LocationID     *uint          `json:"location_id"`
+	Location       *AssetLocation `gorm:"foreignKey:LocationID" json:"location,omitempty"`
+	AssignedToID   *uint          `json:"assigned_to_id"`
+	AssignedTo     *User          `gorm:"foreignKey:AssignedToID" json:"assigned_to,omitempty"`
+	SerialNumber   string         `json:"serial_number"`
+	Brand          string         `json:"brand"`
+	Model          string         `json:"model"`
+	Status         string         `gorm:"default:available;index" json:"status"` // available, assigned, maintenance, damaged, retired, lost
+	Condition      string         `gorm:"default:good" json:"condition"`         // new, good, fair, poor, damaged
+	PurchaseDate   FlexTime       `json:"purchase_date"`
+	PurchasePrice  float64        `json:"purchase_price"`
+	Vendor         string         `json:"vendor"`
+	WarrantyExpiry FlexTime       `json:"warranty_expiry"`
+	Notes          string         `gorm:"type:text" json:"notes"`
+}
+
+type AssetAssignment struct {
+	Base
+	AssetID       uint       `gorm:"index;not null" json:"asset_id"`
+	Asset         *Asset     `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	UserID        uint       `gorm:"index;not null" json:"user_id"`
+	User          *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	AssignedByID  uint       `json:"assigned_by_id"`
+	AssignedBy    *User      `gorm:"foreignKey:AssignedByID" json:"assigned_by,omitempty"`
+	AssignedAt    time.Time  `json:"assigned_at"`
+	ReturnedAt    *time.Time `json:"returned_at"`
+	ConditionOut  string     `json:"condition_out"`
+	ConditionBack string     `json:"condition_back"`
+	Notes         string     `gorm:"type:text" json:"notes"`
+}
+
+type AssetMovement struct {
+	Base
+	AssetID        uint           `gorm:"index;not null" json:"asset_id"`
+	Asset          *Asset         `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	FromLocationID *uint          `json:"from_location_id"`
+	FromLocation   *AssetLocation `gorm:"foreignKey:FromLocationID" json:"from_location,omitempty"`
+	ToLocationID   *uint          `json:"to_location_id"`
+	ToLocation     *AssetLocation `gorm:"foreignKey:ToLocationID" json:"to_location,omitempty"`
+	MovedByID      uint           `json:"moved_by_id"`
+	MovedBy        *User          `gorm:"foreignKey:MovedByID" json:"moved_by,omitempty"`
+	Notes          string         `gorm:"type:text" json:"notes"`
+}
+
+type AssetMaintenance struct {
+	Base
+	AssetID     uint       `gorm:"index;not null" json:"asset_id"`
+	Asset       *Asset     `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	Title       string     `gorm:"not null" json:"title"`
+	Description string     `gorm:"type:text" json:"description"`
+	Vendor      string     `json:"vendor"`
+	Cost        float64    `json:"cost"`
+	ScheduledAt FlexTime   `json:"scheduled_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	Status      string     `gorm:"default:scheduled" json:"status"` // scheduled, completed, cancelled
+}
+
 // ─── TODO ────────────────────────────────────────────
 type Todo struct {
 	Base

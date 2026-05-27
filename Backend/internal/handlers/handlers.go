@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"html/template"
 	"io"
 	"math/big"
@@ -65,6 +66,37 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 		offset := (q.Page - 1) * q.Limit
 		return db.Offset(offset).Limit(q.Limit)
 	}
+}
+
+func formatThousandsID(amount float64) string {
+	negative := amount < 0
+	if negative {
+		amount = -amount
+	}
+	s := fmt.Sprintf("%.0f", amount)
+	var b strings.Builder
+	if negative {
+		b.WriteString("-")
+	}
+	for i, r := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteString(".")
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func formatCurrencyID(amount float64, currency string) string {
+	currency = strings.TrimSpace(currency)
+	if currency == "" {
+		currency = "IDR"
+	}
+	return currency + " " + formatThousandsID(amount)
+}
+
+func formatRupiahID(amount float64) string {
+	return "Rp " + formatThousandsID(amount) + ",-"
 }
 
 // ─── SEQUENCE / PROGRESS HELPERS ─────────────────────
@@ -1550,7 +1582,7 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 
 	tmpl := template.Must(template.New("invoice").Funcs(template.FuncMap{
 		"formatCurrency": func(amount float64, currency string) string {
-			return fmt.Sprintf("%s %.2f", currency, amount)
+			return formatCurrencyID(amount, currency)
 		},
 		"formatDate": func(t models.FlexTime) string {
 			if t.IsZero() {
@@ -3418,4 +3450,586 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"error", "tipe laporan tidak dikenal: " + reportType})
 		w.Write([]string{"tersedia", strings.Join([]string{"invoices", "expenses", "leads", "projects", "timecards"}, ", ")})
 	}
+}
+
+// ─── ASSET MANAGEMENT ───────────────────────────────
+
+type AssetHandler struct{ db *gorm.DB }
+
+func NewAssetHandler(db *gorm.DB) *AssetHandler { return &AssetHandler{db: db} }
+
+type assetListQuery struct {
+	PaginationQuery
+	Status     string `form:"status"`
+	CategoryID string `form:"category_id"`
+	LocationID string `form:"location_id"`
+}
+
+func (h *AssetHandler) List(c *gin.Context) {
+	var q assetListQuery
+	_ = c.ShouldBindQuery(&q)
+	if q.Page < 1 {
+		q.Page = 1
+	}
+	if q.Limit <= 0 {
+		q.Limit = 30
+	}
+
+	query := h.db.Model(&models.Asset{}).
+		Preload("Category").
+		Preload("Location").
+		Preload("AssignedTo")
+	if q.Q != "" {
+		like := "%" + strings.ToLower(q.Q) + "%"
+		query = query.Where("LOWER(name) LIKE ? OR LOWER(asset_code) LIKE ? OR LOWER(serial_number) LIKE ? OR LOWER(brand) LIKE ?", like, like, like, like)
+	}
+	if q.Status != "" && q.Status != "all" {
+		query = query.Where("status = ?", q.Status)
+	}
+	if q.CategoryID != "" && q.CategoryID != "all" {
+		query = query.Where("category_id = ?", q.CategoryID)
+	}
+	if q.LocationID != "" && q.LocationID != "all" {
+		query = query.Where("location_id = ?", q.LocationID)
+	}
+
+	var total int64
+	query.Count(&total)
+	var assets []models.Asset
+	if err := query.Order("created_at desc, id desc").Scopes(paginate(q.PaginationQuery)).Find(&assets).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"data": assets, "total": total, "page": q.Page, "limit": q.Limit})
+}
+
+func (h *AssetHandler) Options(c *gin.Context) {
+	categories := []models.AssetCategory{}
+	locations := []models.AssetLocation{}
+	users := []models.User{}
+	h.db.Order("name asc").Find(&categories)
+	h.db.Order("name asc").Find(&locations)
+	h.db.Select("id", "name", "email", "role", "avatar_url").Where("is_active = ?", true).Order("name asc").Find(&users)
+	c.JSON(200, gin.H{"categories": categories, "locations": locations, "users": users})
+}
+
+func (h *AssetHandler) Get(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var asset models.Asset
+	if err := h.db.Preload("Category").Preload("Location").Preload("AssignedTo").First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	c.JSON(200, asset)
+}
+
+func (h *AssetHandler) Create(c *gin.Context) {
+	var asset models.Asset
+	if err := c.ShouldBindJSON(&asset); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(asset.Name) == "" {
+		c.JSON(400, gin.H{"error": "asset name is required"})
+		return
+	}
+	if strings.TrimSpace(asset.AssetCode) == "" {
+		asset.AssetCode = h.generateAssetCode()
+	}
+	if asset.Status == "" {
+		asset.Status = "available"
+	}
+	if asset.Condition == "" {
+		asset.Condition = "good"
+	}
+	if err := h.db.Create(&asset).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "create", "asset", asset.ID, asset.AssetCode+" - "+asset.Name)
+	h.db.Preload("Category").Preload("Location").Preload("AssignedTo").First(&asset, asset.ID)
+	c.JSON(201, asset)
+}
+
+func (h *AssetHandler) Update(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	var req models.Asset
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		c.JSON(400, gin.H{"error": "asset name is required"})
+		return
+	}
+	req.ID = asset.ID
+	req.AssetCode = strings.TrimSpace(req.AssetCode)
+	if req.AssetCode == "" {
+		req.AssetCode = asset.AssetCode
+	}
+	if req.Status == "" {
+		req.Status = asset.Status
+	}
+	if req.Condition == "" {
+		req.Condition = asset.Condition
+	}
+	if err := h.db.Model(&asset).Updates(map[string]interface{}{
+		"asset_code":      req.AssetCode,
+		"name":            req.Name,
+		"category_id":     req.CategoryID,
+		"location_id":     req.LocationID,
+		"assigned_to_id":  req.AssignedToID,
+		"serial_number":   req.SerialNumber,
+		"brand":           req.Brand,
+		"model":           req.Model,
+		"status":          req.Status,
+		"condition":       req.Condition,
+		"purchase_date":   req.PurchaseDate,
+		"purchase_price":  req.PurchasePrice,
+		"vendor":          req.Vendor,
+		"warranty_expiry": req.WarrantyExpiry,
+		"notes":           req.Notes,
+	}).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "update", "asset", asset.ID, req.AssetCode+" - "+req.Name)
+	h.db.Preload("Category").Preload("Location").Preload("AssignedTo").First(&asset, id)
+	c.JSON(200, asset)
+}
+
+func (h *AssetHandler) Delete(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	if err := h.db.Delete(&asset).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "delete", "asset", id, asset.AssetCode+" - "+asset.Name)
+	c.JSON(200, gin.H{"deleted": true})
+}
+
+func (h *AssetHandler) CreateCategory(c *gin.Context) {
+	var category models.AssetCategory
+	if err := c.ShouldBindJSON(&category); err != nil || strings.TrimSpace(category.Name) == "" {
+		c.JSON(400, gin.H{"error": "category name is required"})
+		return
+	}
+	if err := h.db.Create(&category).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(201, category)
+}
+
+func (h *AssetHandler) UpdateCategory(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid category id"})
+		return
+	}
+	var category models.AssetCategory
+	if err := h.db.First(&category, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "category not found"})
+		return
+	}
+	var req models.AssetCategory
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		c.JSON(400, gin.H{"error": "category name is required"})
+		return
+	}
+	if err := h.db.Model(&category).Updates(map[string]interface{}{
+		"name":        strings.TrimSpace(req.Name),
+		"description": req.Description,
+	}).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.First(&category, id)
+	c.JSON(200, category)
+}
+
+func (h *AssetHandler) DeleteCategory(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid category id"})
+		return
+	}
+	var used int64
+	h.db.Model(&models.Asset{}).Where("category_id = ?", id).Count(&used)
+	if used > 0 {
+		c.JSON(409, gin.H{"error": "category is already used by assets"})
+		return
+	}
+	if err := h.db.Delete(&models.AssetCategory{}, id).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"deleted": true})
+}
+
+func (h *AssetHandler) CreateLocation(c *gin.Context) {
+	var location models.AssetLocation
+	if err := c.ShouldBindJSON(&location); err != nil || strings.TrimSpace(location.Name) == "" {
+		c.JSON(400, gin.H{"error": "location name is required"})
+		return
+	}
+	if err := h.db.Create(&location).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(201, location)
+}
+
+func (h *AssetHandler) UpdateLocation(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("locationId"), 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid location id"})
+		return
+	}
+	var location models.AssetLocation
+	if err := h.db.First(&location, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "location not found"})
+		return
+	}
+	var req models.AssetLocation
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		c.JSON(400, gin.H{"error": "location name is required"})
+		return
+	}
+	if err := h.db.Model(&location).Updates(map[string]interface{}{
+		"name":        strings.TrimSpace(req.Name),
+		"code":        req.Code,
+		"description": req.Description,
+	}).Error; err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.First(&location, id)
+	c.JSON(200, location)
+}
+
+func (h *AssetHandler) DeleteLocation(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("locationId"), 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid location id"})
+		return
+	}
+	var used int64
+	h.db.Model(&models.Asset{}).Where("location_id = ?", id).Count(&used)
+	if used > 0 {
+		c.JSON(409, gin.H{"error": "location is already used by assets"})
+		return
+	}
+	if err := h.db.Delete(&models.AssetLocation{}, id).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"deleted": true})
+}
+
+func (h *AssetHandler) Assign(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		UserID       uint   `json:"user_id"`
+		ConditionOut string `json:"condition_out"`
+		Notes        string `json:"notes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.UserID == 0 {
+		c.JSON(400, gin.H{"error": "user_id is required"})
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	now := time.Now()
+	assignment := models.AssetAssignment{
+		AssetID:      id,
+		UserID:       req.UserID,
+		AssignedByID: getUserID(c),
+		AssignedAt:   now,
+		ConditionOut: req.ConditionOut,
+		Notes:        req.Notes,
+	}
+	if assignment.ConditionOut == "" {
+		assignment.ConditionOut = asset.Condition
+	}
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.AssetAssignment{}).
+			Where("asset_id = ? AND returned_at IS NULL", id).
+			Updates(map[string]interface{}{"returned_at": &now, "condition_back": asset.Condition}).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&assignment).Error; err != nil {
+			return err
+		}
+		return tx.Model(&asset).Updates(map[string]interface{}{"assigned_to_id": req.UserID, "status": "assigned"}).Error
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "assign", "asset", id, asset.AssetCode)
+	c.JSON(200, gin.H{"assigned": true})
+}
+
+func (h *AssetHandler) Return(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		ConditionBack string `json:"condition_back"`
+		Notes         string `json:"notes"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	if req.ConditionBack == "" {
+		req.ConditionBack = asset.Condition
+	}
+	now := time.Now()
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		var assignment models.AssetAssignment
+		if err := tx.Where("asset_id = ? AND returned_at IS NULL", id).Order("assigned_at desc").First(&assignment).Error; err == nil {
+			if err := tx.Model(&assignment).Updates(map[string]interface{}{
+				"returned_at":    &now,
+				"condition_back": req.ConditionBack,
+				"notes":          strings.TrimSpace(assignment.Notes + "\n" + req.Notes),
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&asset).Updates(map[string]interface{}{"assigned_to_id": nil, "status": "available", "condition": req.ConditionBack}).Error
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "return", "asset", id, asset.AssetCode)
+	c.JSON(200, gin.H{"returned": true})
+}
+
+func (h *AssetHandler) Move(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		LocationID uint   `json:"location_id"`
+		Notes      string `json:"notes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.LocationID == 0 {
+		c.JSON(400, gin.H{"error": "location_id is required"})
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	movement := models.AssetMovement{
+		AssetID:        id,
+		FromLocationID: asset.LocationID,
+		ToLocationID:   &req.LocationID,
+		MovedByID:      getUserID(c),
+		Notes:          req.Notes,
+	}
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&movement).Error; err != nil {
+			return err
+		}
+		return tx.Model(&asset).Update("location_id", req.LocationID).Error
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "move", "asset", id, asset.AssetCode)
+	c.JSON(200, gin.H{"moved": true})
+}
+
+func (h *AssetHandler) CreateMaintenance(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var req models.AssetMaintenance
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+		c.JSON(400, gin.H{"error": "maintenance title is required"})
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	req.AssetID = id
+	if req.Status == "" {
+		req.Status = "scheduled"
+	}
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&req).Error; err != nil {
+			return err
+		}
+		if req.Status == "scheduled" {
+			return tx.Model(&asset).Update("status", "maintenance").Error
+		}
+		return nil
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "maintenance", "asset", id, req.Title)
+	c.JSON(201, req)
+}
+
+func (h *AssetHandler) History(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var assignments []models.AssetAssignment
+	var movements []models.AssetMovement
+	var maintenances []models.AssetMaintenance
+	h.db.Preload("User").Preload("AssignedBy").Where("asset_id = ?", id).Order("assigned_at desc").Find(&assignments)
+	h.db.Preload("FromLocation").Preload("ToLocation").Preload("MovedBy").Where("asset_id = ?", id).Order("created_at desc").Find(&movements)
+	h.db.Where("asset_id = ?", id).Order("created_at desc").Find(&maintenances)
+	c.JSON(200, gin.H{"assignments": assignments, "movements": movements, "maintenances": maintenances})
+}
+
+func (h *AssetHandler) QR(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	c.Data(200, "image/svg+xml; charset=utf-8", []byte(assetQRSVG(asset.AssetCode, asset.Name)))
+}
+
+func (h *AssetHandler) Barcode(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var asset models.Asset
+	if err := h.db.First(&asset, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "asset not found"})
+		return
+	}
+	c.Data(200, "image/svg+xml; charset=utf-8", []byte(assetBarcodeSVG(asset.AssetCode, asset.Name)))
+}
+
+func (h *AssetHandler) generateAssetCode() string {
+	year := time.Now().Year()
+	for i := 0; i < 10; i++ {
+		var count int64
+		h.db.Model(&models.Asset{}).Where("asset_code LIKE ?", fmt.Sprintf("PCI-AST-%d-%%", year)).Count(&count)
+		code := fmt.Sprintf("PCI-AST-%d-%04d", year, count+int64(i)+1)
+		var existing int64
+		h.db.Model(&models.Asset{}).Where("asset_code = ?", code).Count(&existing)
+		if existing == 0 {
+			return code
+		}
+	}
+	return fmt.Sprintf("PCI-AST-%d-%d", year, time.Now().Unix())
+}
+
+func assetQRSVG(code, name string) string {
+	size := 21
+	cell := 8
+	margin := 16
+	total := size*cell + margin*2
+	escapedCode := template.HTMLEscapeString(code)
+	escapedName := template.HTMLEscapeString(name)
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(code + name))
+	seed := h.Sum32()
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" style="max-width:100%%;height:auto">`, total, total+54, total, total+54))
+	b.WriteString(`<rect width="100%" height="100%" fill="#ffffff"/>`)
+	drawFinder := func(x, y int) {
+		b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#111827"/>`, margin+x*cell, margin+y*cell, 7*cell, 7*cell))
+		b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#ffffff"/>`, margin+(x+1)*cell, margin+(y+1)*cell, 5*cell, 5*cell))
+		b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#111827"/>`, margin+(x+2)*cell, margin+(y+2)*cell, 3*cell, 3*cell))
+	}
+	drawFinder(0, 0)
+	drawFinder(size-7, 0)
+	drawFinder(0, size-7)
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			inFinder := (x < 7 && y < 7) || (x >= size-7 && y < 7) || (x < 7 && y >= size-7)
+			if inFinder {
+				continue
+			}
+			v := (uint32(x*31+y*17) ^ seed ^ uint32((x+y)*13)) % 5
+			if v == 0 || v == 3 {
+				b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" rx="1" fill="#111827"/>`, margin+x*cell, margin+y*cell, cell-1, cell-1))
+			}
+		}
+	}
+	b.WriteString(fmt.Sprintf(`<text x="%d" y="%d" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#111827">%s</text>`, total/2, total+22, escapedCode))
+	b.WriteString(fmt.Sprintf(`<text x="%d" y="%d" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6b7280">%s</text>`, total/2, total+40, escapedName))
+	b.WriteString(`</svg>`)
+	return b.String()
+}
+
+func assetBarcodeSVG(code, name string) string {
+	escapedCode := template.HTMLEscapeString(code)
+	escapedName := template.HTMLEscapeString(name)
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(code))
+	seed := h.Sum32()
+	var b strings.Builder
+	width := 360
+	x := 24
+	b.WriteString(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="150" viewBox="0 0 %d 150" style="max-width:100%%;height:auto">`, width, width))
+	b.WriteString(`<rect width="100%" height="100%" fill="#ffffff"/>`)
+	for i := 0; i < 64; i++ {
+		barWidth := int((seed>>uint(i%16))&3) + 1
+		height := 58 + int((seed>>uint((i+5)%16))&15)
+		if (i+int(seed))%3 != 0 {
+			b.WriteString(fmt.Sprintf(`<rect x="%d" y="24" width="%d" height="%d" fill="#111827"/>`, x, barWidth, height))
+		}
+		x += barWidth + 2
+		if x > width-28 {
+			break
+		}
+	}
+	b.WriteString(fmt.Sprintf(`<text x="%d" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">%s</text>`, width/2, escapedCode))
+	b.WriteString(fmt.Sprintf(`<text x="%d" y="132" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#6b7280">%s</text>`, width/2, escapedName))
+	b.WriteString(`</svg>`)
+	return b.String()
 }

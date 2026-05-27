@@ -6,6 +6,7 @@
 - Header notifications
 - Announcements
 - Table pagination and numbering
+- Asset Management
 - Local/prod deployment readiness notes
 
 ## Messages
@@ -80,6 +81,51 @@
 - Row numbers continue across pages, for example page 2 starts at 31.
 - Pages without previous client-side pagination now use pagination.
 
+## Asset Management
+- Activated the `Asset Management` menu and route at `/assets`.
+- Added backend database models for:
+  - Asset categories
+  - Asset locations
+  - Assets
+  - Asset assignments
+  - Asset movements
+  - Asset maintenance records
+- Asset category and location lists are database-driven master data.
+- Removed the initial default seed values so dropdowns only show data created by users.
+- Existing unused default seed rows are cleaned up automatically when the backend starts.
+- Added backend API routes:
+  - `GET /api/v1/assets`
+  - `GET /api/v1/assets/options`
+  - `POST /api/v1/assets`
+  - `GET /api/v1/assets/:id`
+  - `PUT /api/v1/assets/:id`
+  - `DELETE /api/v1/assets/:id`
+  - `POST /api/v1/assets/categories`
+  - `POST /api/v1/assets/locations`
+  - `POST /api/v1/assets/:id/assign`
+  - `POST /api/v1/assets/:id/return`
+  - `POST /api/v1/assets/:id/move`
+  - `POST /api/v1/assets/:id/maintenance`
+  - `GET /api/v1/assets/:id/history`
+  - `GET /api/v1/assets/:id/qr`
+  - `GET /api/v1/assets/:id/barcode`
+- Added asset list page with:
+  - summary counters
+  - search
+  - status filter
+  - 30-row pagination
+  - continuous `No.` numbering across pages
+  - create/edit/delete actions
+  - create new category from the page
+  - create new location from the page
+  - assign asset to user
+  - return assigned asset
+  - move asset location
+  - create maintenance record
+  - view assignment/movement/maintenance history
+  - view QR Code and Barcode labels
+- Asset code can be entered manually or auto-generated as `PCI-AST-YYYY-0001`.
+
 ## Local Routing Fix
 - Fixed local frontend Nginx proxy target from generic `backend:8080` to `nexone-pci-backend:8080`.
 - This prevents login requests from being routed to another Docker project on the shared network.
@@ -87,6 +133,8 @@
 ## Verification
 - Frontend build passed with `npm run build`.
 - Backend compile/tests passed with `go test ./...`.
+- Asset Management backend compile passed with `go test ./...`.
+- Asset Management frontend build passed with `npm run build`.
 - Local Docker services were rebuilt during development.
 - Message API was tested locally:
   - user list loads

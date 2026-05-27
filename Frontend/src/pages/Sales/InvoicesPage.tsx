@@ -139,7 +139,7 @@ export default function InvoicesPage() {
     } catch { toast.error('Failed to delete') }
   }
 
-  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString()}`
+  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
   const subtotalAmount = Number(form.subtotal_amount) || 0
   const taxAmount = Number(form.tax_amount) || 0
   const discountAmount = Number(form.discount_amount) || 0

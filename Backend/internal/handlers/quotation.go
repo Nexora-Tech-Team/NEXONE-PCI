@@ -202,7 +202,7 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 
 	tmpl := template.Must(template.New("quotation").Funcs(template.FuncMap{
 		"formatCurrency": func(amount float64, currency string) string {
-			return fmt.Sprintf("%s %.2f", currency, amount)
+			return formatCurrencyID(amount, currency)
 		},
 		"formatDate": func(t models.FlexTime) string {
 			if t.IsZero() {
@@ -211,16 +211,7 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 			return t.Format("02 January 2006")
 		},
 		"formatRp": func(amount float64) string {
-			s := fmt.Sprintf("%.0f", amount)
-			n := len(s)
-			result := ""
-			for i, c := range s {
-				if i > 0 && (n-i)%3 == 0 {
-					result += "."
-				}
-				result += string(c)
-			}
-			return "Rp " + result + ",-"
+			return formatRupiahID(amount)
 		},
 		"inc": func(i int) int { return i + 1 },
 		"sub": func(a, b float64) float64 { return a - b },

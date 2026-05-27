@@ -211,6 +211,29 @@ export const expenseService = {
   delete: (id: number) => api.delete(`/expenses/${id}`),
 }
 
+// ─── Asset Management ───────────────────────────────
+export const assetService = {
+  list: (params?: any) => api.get('/assets', { params }),
+  options: () => api.get('/assets/options'),
+  get: (id: number) => api.get(`/assets/${id}`),
+  create: (data: any) => api.post('/assets', data),
+  update: (id: number, data: any) => api.put(`/assets/${id}`, data),
+  delete: (id: number) => api.delete(`/assets/${id}`),
+  createCategory: (data: any) => api.post('/assets/categories', data),
+  updateCategory: (id: number, data: any) => api.put(`/assets/categories/${id}`, data),
+  deleteCategory: (id: number) => api.delete(`/assets/categories/${id}`),
+  createLocation: (data: any) => api.post('/assets/locations', data),
+  updateLocation: (id: number, data: any) => api.put(`/assets/locations/${id}`, data),
+  deleteLocation: (id: number) => api.delete(`/assets/locations/${id}`),
+  assign: (id: number, data: any) => api.post(`/assets/${id}/assign`, data),
+  returnAsset: (id: number, data: any) => api.post(`/assets/${id}/return`, data),
+  move: (id: number, data: any) => api.post(`/assets/${id}/move`, data),
+  maintenance: (id: number, data: any) => api.post(`/assets/${id}/maintenance`, data),
+  history: (id: number) => api.get(`/assets/${id}/history`),
+  qr: (id: number) => api.get(`/assets/${id}/qr`, { responseType: 'text' }),
+  barcode: (id: number) => api.get(`/assets/${id}/barcode`, { responseType: 'text' }),
+}
+
 // ─── Files ───────────────────────────────────────────
 export const fileService = {
   list: (params?: any) => api.get('/files', { params }),

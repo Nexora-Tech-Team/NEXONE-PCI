@@ -244,6 +244,31 @@ func (s *Server) setupRoutes() {
 			expenses.DELETE("/:id", expenseH.Delete)
 		}
 
+		// Asset Management
+		assetH := handlers.NewAssetHandler(s.db)
+		assets := protected.Group("/assets")
+		{
+			assets.GET("", assetH.List)
+			assets.GET("/options", assetH.Options)
+			assets.POST("", assetH.Create)
+			assets.POST("/categories", assetH.CreateCategory)
+			assets.PUT("/categories/:categoryId", assetH.UpdateCategory)
+			assets.DELETE("/categories/:categoryId", assetH.DeleteCategory)
+			assets.POST("/locations", assetH.CreateLocation)
+			assets.PUT("/locations/:locationId", assetH.UpdateLocation)
+			assets.DELETE("/locations/:locationId", assetH.DeleteLocation)
+			assets.GET("/:id", assetH.Get)
+			assets.PUT("/:id", assetH.Update)
+			assets.DELETE("/:id", assetH.Delete)
+			assets.POST("/:id/assign", assetH.Assign)
+			assets.POST("/:id/return", assetH.Return)
+			assets.POST("/:id/move", assetH.Move)
+			assets.POST("/:id/maintenance", assetH.CreateMaintenance)
+			assets.GET("/:id/history", assetH.History)
+			assets.GET("/:id/qr", assetH.QR)
+			assets.GET("/:id/barcode", assetH.Barcode)
+		}
+
 		// Team
 		teamH := handlers.NewTeamHandler(s.db)
 		team := protected.Group("/team")
