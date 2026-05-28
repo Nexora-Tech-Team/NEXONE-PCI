@@ -1646,7 +1646,20 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 </head>
 <body>
 <div class="header">
-  <div class="company">CBQA / OneTool</div>
+  <div class="company">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="72" height="72" role="img">
+      <g fill="none" stroke="#ed1b2f" stroke-linejoin="round">
+        <path d="M160 35 239 80.5v91L160 217 81 171.5v-91L160 35Z" fill="#ed1b2f" stroke-width="0"/>
+        <path d="M160 49 226.5 87.5v77L160 203 93.5 164.5v-77L160 49Z" stroke="#ffffff" stroke-width="7"/>
+      </g>
+      <g fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-weight="800" text-anchor="middle">
+        <text x="160" y="143" font-size="50" letter-spacing="3">PCI</text>
+      </g>
+      <g fill="#ed1b2f" font-family="Arial, Helvetica, sans-serif" font-weight="900" text-anchor="middle">
+        <text x="160" y="270" font-size="39" letter-spacing="7">QUALITY</text>
+      </g>
+    </svg>
+  </div>
   <div class="invoice-title">
     <h1>INVOICE</h1>
     <p>{{.InvoiceNumber}}</p>
