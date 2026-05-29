@@ -24,7 +24,7 @@ const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString(
 
 const emptyForm = () => ({
   quote_number: '',
-  revision: 1,
+  revision: 0,
   title: '',
   client_id: '',
   project_id: '',
@@ -112,7 +112,7 @@ export default function QuotationsPage() {
     setEditItem(row)
     setForm({
       quote_number: row.quote_number,
-      revision: row.revision || 1,
+      revision: row.revision ?? 0,
       title: row.title,
       client_id: String(row.client_id || ''),
       project_id: String(row.project_id || ''),
@@ -158,7 +158,7 @@ export default function QuotationsPage() {
         ...form,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
-        revision: Number(form.revision) || 1,
+        revision: Number(form.revision),
         subtotal_amount: subtotal,
         discount_pct: Number(form.discount_pct) || 0,
         tax_pct: Number(form.tax_pct) || 0,
@@ -299,7 +299,7 @@ export default function QuotationsPage() {
                     <tr key={row.id}>
                       <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                       <td className="font-medium text-blue-600">{row.quote_number}</td>
-                      <td className="text-gray-400 text-xs">r{row.revision || 1}</td>
+                      <td className="text-gray-400 text-xs">r{row.revision ?? 0}</td>
                       <td>{row.title}</td>
                       <td className="text-gray-500">{row.client?.name || '-'}</td>
                       <td className="text-gray-500 text-xs">{row.pic || '-'}</td>
@@ -371,7 +371,7 @@ export default function QuotationsPage() {
             <input className="input" value={form.quote_number} onChange={(e) => setForm({ ...form, quote_number: e.target.value })} />
           </FormField>
           <FormField label="Revision">
-            <input className="input" type="number" min={1} value={form.revision}
+            <input className="input" type="number" min={0} value={form.revision}
               onChange={(e) => setForm({ ...form, revision: Number(e.target.value) })} />
           </FormField>
 
