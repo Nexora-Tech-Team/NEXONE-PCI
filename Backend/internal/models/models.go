@@ -222,6 +222,7 @@ type Lead struct {
 	Email          string  `json:"email"`
 	Source         string  `json:"source"`
 	Status         string  `gorm:"default:new" json:"status"` // new, qualified, discussion, negotiation, won, lost
+	EstimatedValue float64 `json:"estimated_value"`
 	OwnerID        uint    `json:"owner_id"`
 	Owner          *User   `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Notes          string  `json:"notes"`

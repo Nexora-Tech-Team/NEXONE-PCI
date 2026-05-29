@@ -12,7 +12,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts'
 import clsx from 'clsx'
 import { toast } from 'react-toastify'
 import { RootState, AppDispatch } from '@/store'
@@ -196,6 +196,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [loading, setLoading] = useState(true)
   const [clockLoading, setClockLoading] = useState(false)
+  const [funnelData, setFunnelData] = useState<any>(null)
 
   const hasAccess = useCallback((menu: string) => (
     canRead(permissions, user?.role, menu)
@@ -266,6 +267,12 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    dashboardService.getFunnelStats()
+      .then(r => setFunnelData(r.data || null))
+      .catch(() => {})
+  }, [])
 
   const handleClock = async () => {
     if (!canViewTimecards) return
@@ -592,6 +599,148 @@ export default function DashboardPage() {
           </div>
         </section>
       ) : null}
+
+      {funnelData && (() => {
+        const rp = (n: number) => `Rp${Number(n || 0).toLocaleString('id-ID')}`
+
+        const funnelLayers = [
+          { label: 'Leads',        value: funnelData.leads_value,        count: funnelData.leads_count,        color: '#7dd3fc' },
+          { label: 'Proposal',     value: funnelData.proposals_value,    count: funnelData.proposals_count,    color: '#38bdf8' },
+          { label: 'Negotiations', value: funnelData.negotiations_value, count: funnelData.negotiations_count, color: '#0ea5e9' },
+          { label: 'Contract/Won', value: funnelData.won_value,          count: funnelData.won_count,          color: '#0369a1' },
+          { label: 'Project',      value: funnelData.projects_value,     count: funnelData.projects_count,     color: '#1a5276' },
+        ]
+        const maxCount = Math.max(...funnelLayers.map(l => l.count || 1), 1)
+        const minW = 28
+        const widths = funnelLayers.map(l => minW + ((l.count / maxCount) * (100 - minW)))
+
+        const LEAD_STATUSES = ['new', 'qualified', 'discussion', 'negotiation', 'won', 'lost']
+        const LEAD_LABELS: Record<string, string> = { new: 'New', qualified: 'Qualified', discussion: 'Discussion', negotiation: 'Negotiation', won: 'Won', lost: 'Lost' }
+        const leadsBar = LEAD_STATUSES.map(s => ({
+          name: LEAD_LABELS[s],
+          jumlah: (funnelData.leads_by_status || []).find((x: any) => x.status === s)?.count || 0,
+        }))
+
+        const PROP_STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted']
+        const PROP_LABELS: Record<string, string> = { draft: 'Draft', sent: 'Sent', accepted: 'Accepted', rejected: 'Rejected', expired: 'Expired', converted: 'Converted' }
+        const PROP_COLORS = ['#94a3b8', '#60a5fa', '#34d399', '#f87171', '#fb923c', '#1a5276']
+        const proposalPie = PROP_STATUSES.map((s, i) => ({
+          name: PROP_LABELS[s],
+          value: (funnelData.proposals_by_status || []).find((x: any) => x.status === s)?.count || 0,
+          color: PROP_COLORS[i],
+        })).filter(d => d.value > 0)
+
+        return (
+          <section className="grid gap-4 xl:grid-cols-[1.1fr_0.95fr_0.95fr]">
+
+            {/* SALES FUNNEL */}
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/50">Sales</p>
+                  <span className="section-title">Sales Funnel</span>
+                </div>
+                <p className="text-xs text-gray-400">From Prospect to Contract.</p>
+              </div>
+              <div className="card-body py-3 px-2">
+                {(() => {
+                  const W = 300, LH = 48, GAP = 3
+                  const cx = W / 2
+                  const getTopW = (i: number) => widths[i] * W / 100
+                  const getBotW = (i: number) => i < funnelLayers.length - 1
+                    ? widths[i + 1] * W / 100
+                    : widths[i] * 0.78 * W / 100
+                  const totalH = funnelLayers.length * (LH + GAP) - GAP
+                  return (
+                    <svg viewBox={`0 0 ${W} ${totalH}`} width="100%" style={{ display: 'block' }}>
+                      <defs>
+                        <filter id="fnl-ts" x="-20%" y="-40%" width="140%" height="180%">
+                          <feDropShadow dx="0" dy="1" stdDeviation="1.2" floodColor="#000" floodOpacity="0.35" />
+                        </filter>
+                      </defs>
+                      {funnelLayers.map((layer, i) => {
+                        const tw = getTopW(i), bw = getBotW(i)
+                        const y = i * (LH + GAP)
+                        const tlx = cx - tw / 2, trx = cx + tw / 2
+                        const blx = cx - bw / 2, brx = cx + bw / 2
+                        const pts = `${tlx},${y} ${trx},${y} ${brx},${y + LH} ${blx},${y + LH}`
+                        const line2 = layer.value > 0
+                          ? `${rp(layer.value)} (${layer.count} ${i === 4 ? 'projects' : 'items'})`
+                          : `${layer.count} ${i === 4 ? 'projects' : 'items'}`
+                        return (
+                          <g key={layer.label}>
+                            <polygon points={pts} fill={layer.color} />
+                            <text x={cx} y={y + LH / 2 - 7} textAnchor="middle" dominantBaseline="middle"
+                              fontSize="11.5" fontWeight="800" fill="white" filter="url(#fnl-ts)">
+                              {layer.label}
+                            </text>
+                            <text x={cx} y={y + LH / 2 + 8} textAnchor="middle" dominantBaseline="middle"
+                              fontSize="10" fontWeight="600" fill="rgba(255,255,255,0.9)" filter="url(#fnl-ts)">
+                              {line2}
+                            </text>
+                          </g>
+                        )
+                      })}
+                    </svg>
+                  )
+                })()}
+              </div>
+            </div>
+
+            {/* LEADS MONITORING */}
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/50">Leads</p>
+                  <span className="section-title">Leads Monitoring</span>
+                </div>
+              </div>
+              <div className="card-body p-3">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={leadsBar} margin={{ top: 4, right: 8, left: -20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <Tooltip formatter={(v: any) => [v, 'Jumlah']} />
+                    <Bar dataKey="jumlah" radius={[4, 4, 0, 0]}>
+                      {leadsBar.map((_, i) => (
+                        <Cell key={i} fill={['#60a5fa', '#34d399', '#fbbf24', '#f97316', '#1a5276', '#f87171'][i]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* PROPOSAL MONITORING */}
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/50">Proposals</p>
+                  <span className="section-title">Proposal Monitoring</span>
+                </div>
+              </div>
+              <div className="card-body flex flex-col items-center p-3">
+                <PieChart width={200} height={200}>
+                  <Pie data={proposalPie} cx={100} cy={95} innerRadius={50} outerRadius={90} dataKey="value" paddingAngle={2}>
+                    {proposalPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: any, n: any) => [v, n]} />
+                </PieChart>
+                <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1">
+                  {proposalPie.map(d => (
+                    <span key={d.name} className="flex items-center gap-1 text-[10px] text-gray-500">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                      {d.name} ({d.value})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          </section>
+        )
+      })()}
 
       {visibleStatCards.length > 0 ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -40,7 +40,7 @@ export default function LeadsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({
-    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '',
+    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', estimated_value: 0, notes: '',
   })
 
   // Client combobox state
@@ -110,7 +110,7 @@ export default function LeadsPage() {
 
   const openEdit = (l: any) => {
     setEditItem(l)
-    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, notes: l.notes || '' })
+    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, estimated_value: l.estimated_value || 0, notes: l.notes || '' })
     setClientSearch(l.name)
     setSelectedClientId(null)
     setClientContacts([])
@@ -404,13 +404,14 @@ export default function LeadsPage() {
           <FormField label="Phone">
             <input className="input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+62..." />
           </FormField>
-          <div className="col-span-2">
-            <FormField label="Status">
-              <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                {PIPELINE.map(s => <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>)}
-              </select>
-            </FormField>
-          </div>
+          <FormField label="Status">
+            <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+              {PIPELINE.map(s => <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Estimated Value (IDR)">
+            <input className="input" type="number" min="0" value={form.estimated_value || ''} onChange={e => setForm({ ...form, estimated_value: Number(e.target.value) || 0 })} placeholder="0" />
+          </FormField>
           <div className="col-span-2">
             <FormField label="Notes">
               <textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notes..." />
