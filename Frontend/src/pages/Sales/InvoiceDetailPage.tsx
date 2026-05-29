@@ -168,6 +168,7 @@ export default function InvoiceDetailPage() {
 
   const handleAddPayment = async () => {
     if (!paymentForm.amount || paymentForm.amount <= 0) { toast.error('Amount is required'); return }
+    if (Number(paymentForm.amount) > invoice.due_amount) { toast.error('Amount exceeds remaining due'); return }
     if (!paymentForm.payment_date) { toast.error('Payment date is required'); return }
     setSavingPayment(true)
     try {

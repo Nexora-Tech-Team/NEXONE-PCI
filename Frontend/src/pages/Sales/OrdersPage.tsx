@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { orderService, clientService, projectService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { Plus, FileDown } from 'lucide-react'
+import { Plus, FileDown, FileText } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput,
   StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
@@ -60,6 +60,16 @@ export default function OrdersPage() {
     finally { setSaving(false) }
   }
 
+  const handleConvertToInvoice = async (id: number) => {
+    try {
+      await orderService.convertToInvoice(id)
+      toast.success('Invoice created from order!')
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to convert to invoice')
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteId) return
     try {
@@ -101,7 +111,14 @@ export default function OrdersPage() {
                     <td className="whitespace-nowrap font-medium">{o.currency} {Number(o.amount).toLocaleString('id-ID')}</td>
                     <td><StatusBadge status={o.status} /></td>
                     <td>
-                      <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(o.id)}>×</button>
+                      <div className="flex gap-1">
+                        <button
+                          title="Convert to Invoice"
+                          className="btn btn-secondary text-xs py-0.5 px-2"
+                          onClick={() => handleConvertToInvoice(o.id)}
+                        ><FileText size={12} /></button>
+                        <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(o.id)}>×</button>
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -1452,7 +1452,11 @@ type InvoiceHandler struct{ db *gorm.DB }
 
 func NewInvoiceHandler(db *gorm.DB) *InvoiceHandler { return &InvoiceHandler{db: db} }
 
-func (h *InvoiceHandler) applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
 	if subtotal < 0 {
 		subtotal = 0
 	}
@@ -1484,11 +1488,22 @@ func (h *InvoiceHandler) applyInvoiceTotals(invoice *models.Invoice, subtotal, p
 		invoice.Status = "fully_paid"
 	case paidAmount > 0:
 		invoice.Status = "partially_paid"
-	case !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(time.Now()):
+	case !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(startOfDay(time.Now())):
 		invoice.Status = "overdue"
 	default:
 		invoice.Status = "not_paid"
 	}
+}
+
+func recalcInvoiceDB(db *gorm.DB, invoiceID uint) {
+	var invoice models.Invoice
+	db.First(&invoice, invoiceID)
+	var subtotal float64
+	db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
+	var paidAmount float64
+	db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
+	applyInvoiceTotals(&invoice, subtotal, paidAmount)
+	db.Save(&invoice)
 }
 
 func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
@@ -1509,6 +1524,10 @@ func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
 }
 
 func (h *InvoiceHandler) List(c *gin.Context) {
+	h.db.Model(&models.Invoice{}).
+		Where("status = 'not_paid' AND due_date < ? AND deleted_at IS NULL", startOfDay(time.Now())).
+		Update("status", "overdue")
+
 	var q PaginationQuery
 	c.ShouldBindQuery(&q)
 	var invoices []models.Invoice
@@ -1540,7 +1559,7 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 	if subtotal == 0 {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
-	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
+	applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
 	if err := h.db.Create(&invoice).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1596,12 +1615,7 @@ func (h *InvoiceHandler) Update(c *gin.Context) {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
 
-	paidAmount := invoice.PaidAmount
-	if paymentTotals.Count > 0 {
-		paidAmount = paymentTotals.Total
-	}
-
-	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
+	applyInvoiceTotals(&invoice, subtotal, paymentTotals.Total)
 	h.db.Save(&invoice)
 	recordAudit(h.db, c, "update", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusOK, invoice)
@@ -1861,14 +1875,7 @@ func (h *InvoiceHandler) DeletePayment(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) recalcInvoice(invoiceID uint) {
-	var invoice models.Invoice
-	h.db.First(&invoice, invoiceID)
-	var subtotal float64
-	h.db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
-	var paidAmount float64
-	h.db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
-	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
-	h.db.Save(&invoice)
+	recalcInvoiceDB(h.db, invoiceID)
 }
 
 func (h *InvoiceHandler) Summary(c *gin.Context) {
@@ -1898,7 +1905,9 @@ func (h *PaymentHandler) List(c *gin.Context) {
 	var payments []models.Payment
 	var total int64
 	q := c.Query("q")
-	query := h.db.Preload("Invoice.Client").Order("payment_date desc")
+	month := c.Query("month")
+	year := c.Query("year")
+	query := h.db.Preload("Invoice.Client").Order("COALESCE(payment_date, created_at) desc")
 	needsInvoiceJoin := c.Query("client_id") != "" || q != ""
 	if needsInvoiceJoin {
 		query = query.Joins("JOIN invoices ON invoices.id = payments.invoice_id")
@@ -1910,6 +1919,12 @@ func (h *PaymentHandler) List(c *gin.Context) {
 		query = query.Joins("LEFT JOIN clients ON clients.id = invoices.client_id").
 			Where("invoices.invoice_number ILIKE ? OR clients.name ILIKE ? OR payments.payment_method ILIKE ? OR payments.note ILIKE ?",
 				"%"+q+"%", "%"+q+"%", "%"+q+"%", "%"+q+"%")
+	}
+	if year != "" {
+		query = query.Where("EXTRACT(YEAR FROM COALESCE(payment_date, payments.created_at)) = ?", year)
+	}
+	if month != "" {
+		query = query.Where("EXTRACT(MONTH FROM COALESCE(payment_date, payments.created_at)) = ?", month)
 	}
 	query.Find(&payments)
 	total = int64(len(payments))
@@ -1940,6 +1955,7 @@ func (h *PaymentHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete payment"})
 		return
 	}
+	recalcInvoiceDB(h.db, payment.InvoiceID)
 	recordAudit(h.db, c, "DELETE", "payment", id, fmt.Sprintf("payment #%d", id))
 	c.JSON(http.StatusOK, gin.H{"message": "Payment deleted"})
 }
@@ -2103,6 +2119,49 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 	}
 	h.db.Delete(&order)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+func (h *OrderHandler) ConvertToInvoice(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var order models.Order
+	if err := h.db.Preload("Client").First(&order, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	d := time.Now()
+	invoiceNumber := fmt.Sprintf("INV-%04d%02d-%04d", d.Year(), d.Month(), id)
+
+	var existing models.Invoice
+	if h.db.Where("invoice_number = ?", invoiceNumber).First(&existing).Error == nil {
+		invoiceNumber = fmt.Sprintf("INV-%04d%02d-%d", d.Year(), d.Month(), time.Now().UnixMilli()%10000)
+	}
+
+	dueDate := d.AddDate(0, 1, 0)
+	invoice := models.Invoice{
+		InvoiceNumber:  invoiceNumber,
+		ClientID:       order.ClientID,
+		ProjectID:      order.ProjectID,
+		BillDate:       models.FlexTime{Time: d},
+		DueDate:        models.FlexTime{Time: dueDate},
+		Status:         "not_paid",
+		Currency:       order.Currency,
+		TotalAmount:    order.Amount,
+		TaxAmount:      0,
+		DiscountAmount: 0,
+		PaidAmount:     0,
+		DueAmount:      order.Amount,
+	}
+	if err := h.db.Create(&invoice).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create invoice"})
+		return
+	}
+	h.db.Exec("INSERT INTO order_invoices (order_id, invoice_id) VALUES (?, ?) ON CONFLICT DO NOTHING", order.ID, invoice.ID)
+	recordAudit(h.db, c, "CONVERT", "order", id, order.OrderNumber)
+	c.JSON(http.StatusCreated, invoice)
 }
 
 // ─── EVENT ───────────────────────────────────────────
