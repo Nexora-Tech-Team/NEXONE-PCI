@@ -352,8 +352,8 @@ const quotationPrintTemplate = `<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:28px 32px;}
 @media print{
-  @page{size:A4;margin:15mm 15mm 15mm 15mm;}
-  body{padding:0;}
+  @page{size:A4;margin:0;}
+  body{padding:20px 28px;}
   .no-print{display:none!important;}
   .page-break{page-break-before:always;}
 }

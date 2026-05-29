@@ -1669,7 +1669,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 <title>Invoice {{.InvoiceNumber}}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #fff; padding: 40px; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; padding: 40px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 24px; }
   .company { font-size: 24px; font-weight: 700; color: #2563eb; }
   .invoice-title { text-align: right; }
@@ -1677,7 +1677,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   .invoice-title p { color: #64748b; margin-top: 4px; }
   .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px; }
   .meta-box h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
-  .meta-box p { font-size: 13px; line-height: 1.6; }
+  .meta-box p { font-size: 12px; line-height: 1.6; }
   .status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
   .status-draft { background: #f1f5f9; color: #64748b; }
   .status-not_paid { background: #fef3c7; color: #92400e; }
@@ -1695,9 +1695,10 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   .totals td { padding: 6px 12px; }
   .totals .label { color: #64748b; }
   .totals .total-row td { font-weight: 700; font-size: 15px; border-top: 2px solid #2563eb; padding-top: 10px; color: #2563eb; }
-  .payments h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #374151; }
+  .payments h3 { font-size: 12px; font-weight: 600; margin-bottom: 10px; color: #374151; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
   @media print {
+    @page { margin: 0; }
     body { padding: 20px; }
     .no-print { display: none; }
   }
